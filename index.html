@@ -160,6 +160,11 @@
       const [muted, setMuted]             = useState(false);
       const [checkedTaskKeys, setCheckedTaskKeys] = useState({});
       const [showUpNext, setShowUpNext]           = useState(false);
+      const [pomTaskIdx, setPomTaskIdx]           = useState(0);
+      const [pomTaskSecsLeft, setPomTaskSecsLeft] = useState(null);
+      const [taskPromptKey, setTaskPromptKey]     = useState(null);
+      const [countdown, setCountdown]             = useState(null);
+      const [skippedTaskKeys, setSkippedTaskKeys] = useState({});
       const [themeMode, setThemeMode] = useState(() => {
         try { return localStorage.getItem("tapl-theme") || "dark"; } catch(e) { return "dark"; }
       });
@@ -178,6 +183,9 @@
       const deadlineRef = useRef(null);
       const phaseRef    = useRef("work");
       const blockIdxRef = useRef(0);
+      const taskIdxRef  = useRef(0);
+      const taskDeadlineRef = useRef(null);
+      const countdownRef = useRef(null);
 
       const activeBlocks  = blocks.filter(b => b.items.length > 0 && !deferredBlockIds.includes(b.id));
       const deferredBlocks = blocks.filter(b => b.items.length > 0 && deferredBlockIds.includes(b.id));
@@ -258,6 +266,79 @@
         } catch(e) { console.warn("Audio error:", e); }
       };
 
+      // ── 3-2-1-GO countdown ──
+      const runCountdown = (onComplete) => {
+        clearInterval(countdownRef.current);
+        let count = 3;
+        setCountdown(count);
+        countdownRef.current = setInterval(() => {
+          count--;
+          if (count > 0) {
+            setCountdown(count);
+          } else if (count === 0) {
+            setCountdown("GO");
+          } else {
+            clearInterval(countdownRef.current);
+            countdownRef.current = null;
+            setCountdown(null);
+            onComplete();
+          }
+        }, 800);
+      };
+
+      // ── Inner ring: task timer helpers ──
+      const startTaskTimer = (blockIdx, taskIdx) => {
+        const blk = activeBlocks[blockIdx];
+        if (!blk || !blk.items[taskIdx]) {
+          // No more tasks — clear inner ring
+          taskDeadlineRef.current = null;
+          setPomTaskIdx(taskIdx);
+          taskIdxRef.current = taskIdx;
+          setPomTaskSecsLeft(null);
+          return;
+        }
+        const mins = parseInt(blk.items[taskIdx].mins) || 0;
+        setPomTaskIdx(taskIdx);
+        taskIdxRef.current = taskIdx;
+        if (mins > 0) {
+          const secs = mins * 60;
+          taskDeadlineRef.current = Date.now() + secs * 1000;
+          setPomTaskSecsLeft(secs);
+        } else {
+          // No duration — show task but don't start a timer, user can skip manually
+          taskDeadlineRef.current = null;
+          setPomTaskSecsLeft(null);
+        }
+      };
+
+      const advanceTask = () => {
+        const bIdx = blockIdxRef.current;
+        const tIdx = taskIdxRef.current;
+        const blk  = activeBlocks[bIdx];
+        if (!blk) return;
+        const item = blk.items[tIdx];
+        if (item) {
+          // Show completion prompt for this task
+          const itmKey = blk.id + ":" + (item.splitId || "task-" + item.taskId);
+          setTaskPromptKey(itmKey);
+        }
+        // Move to next task
+        startTaskTimer(bIdx, tIdx + 1);
+      };
+
+      const skipTask = () => {
+        const bIdx = blockIdxRef.current;
+        const tIdx = taskIdxRef.current;
+        const blk  = activeBlocks[bIdx];
+        if (blk && blk.items[tIdx]) {
+          const item = blk.items[tIdx];
+          const itmKey = blk.id + ":" + (item.splitId || "task-" + item.taskId);
+          setSkippedTaskKeys(prev => ({ ...prev, [itmKey]: true }));
+        }
+        taskDeadlineRef.current = null;
+        startTaskTimer(bIdx, tIdx + 1);
+      };
+
       const advancePhase = () => {
         const phase = phaseRef.current;
         const idx   = blockIdxRef.current;
@@ -269,21 +350,29 @@
           const blk  = activeBlocks[idx];
           const secs = (blk ? blk.breakMins || 10 : 10) * 60;
           deadlineRef.current = Date.now() + secs * 1000;
+          taskDeadlineRef.current = null; setPomTaskSecsLeft(null); setTaskPromptKey(null);
           setPomSecsLeft(secs); setPomPhase("break"); phaseRef.current = "break";
         } else {
           const next = idx + 1;
           if (next >= activeBlocks.length) {
             // All done — celebratory three-note sequence
             playTone("session_done");
-            setPomRunning(false); setPomComplete(true); setPomPhase("done"); deadlineRef.current = null;
+            setPomRunning(false); setPomComplete(true); setPomPhase("done"); deadlineRef.current = null; taskDeadlineRef.current = null;
           } else {
-            // Break over — sharp attention pulse
+            // Break over — countdown then start next block
             playTone("break_done");
             const blk  = activeBlocks[next];
             const secs = (blk.maxMins || 40) * 60;
-            deadlineRef.current = Date.now() + secs * 1000;
+            setPomRunning(false);
             setPomBlockIdx(next); blockIdxRef.current = next;
             setPomSecsLeft(secs); setPomPhase("work"); phaseRef.current = "work";
+            setTaskPromptKey(null);
+            setPomTaskIdx(0); taskIdxRef.current = 0; setPomTaskSecsLeft(null); taskDeadlineRef.current = null;
+            runCountdown(() => {
+              deadlineRef.current = Date.now() + secs * 1000;
+              startTaskTimer(next, 0);
+              setPomRunning(true);
+            });
           }
         }
       };
@@ -291,15 +380,28 @@
       useEffect(() => {
         if (!pomRunning || !deadlineRef.current) { clearInterval(timerRef.current); return; }
         timerRef.current = setInterval(() => {
+          // Outer ring (block)
           const secsLeft = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000));
           setPomSecsLeft(secsLeft);
+          // Inner ring (task) — only during work phase
+          if (taskDeadlineRef.current && phaseRef.current === "work") {
+            const taskSecs = Math.max(0, Math.round((taskDeadlineRef.current - Date.now()) / 1000));
+            setPomTaskSecsLeft(taskSecs);
+            if (taskSecs <= 0) {
+              taskDeadlineRef.current = null;
+              advanceTask();
+            }
+          }
           if (secsLeft <= 0) { clearInterval(timerRef.current); advancePhase(); }
         }, 500);
         return () => clearInterval(timerRef.current);
       }, [pomRunning]);
 
       const pauseResume = () => setPomRunning(r => {
-        if (!r && pomSecsLeft > 0) deadlineRef.current = Date.now() + pomSecsLeft * 1000;
+        if (!r && pomSecsLeft > 0) {
+          deadlineRef.current = Date.now() + pomSecsLeft * 1000;
+          if (pomTaskSecsLeft > 0) taskDeadlineRef.current = Date.now() + pomTaskSecsLeft * 1000;
+        }
         return !r;
       });
       const startSession = () => {
@@ -308,9 +410,16 @@
         try { getCtx(); } catch(e) {}
         clearInterval(timerRef.current);
         const secs = (activeBlocks[0].maxMins || 40) * 60;
-        deadlineRef.current = Date.now() + secs * 1000;
         phaseRef.current = "work"; blockIdxRef.current = 0;
-        setPomBlockIdx(0); setPomPhase("work"); setPomSecsLeft(secs); setPomComplete(false); setPomRunning(true); setStep(4);
+        taskIdxRef.current = 0; setTaskPromptKey(null);
+        setPomBlockIdx(0); setPomPhase("work"); setPomSecsLeft(secs); setPomComplete(false); setPomRunning(false); setStep(4);
+        setPomTaskIdx(0); setPomTaskSecsLeft(null); taskDeadlineRef.current = null;
+        // Countdown then auto-start both block and task timers
+        runCountdown(() => {
+          deadlineRef.current = Date.now() + secs * 1000;
+          startTaskTimer(0, 0);
+          setPomRunning(true);
+        });
       };
       const skipPhase = () => {
         clearInterval(timerRef.current); setPomRunning(false);
@@ -320,30 +429,38 @@
           const blk = activeBlocks[pomBlockIdx];
           const secs = (blk ? blk.breakMins || 10 : 10) * 60;
           deadlineRef.current = Date.now() + secs * 1000;
+          taskDeadlineRef.current = null; setPomTaskSecsLeft(null); setTaskPromptKey(null);
           phaseRef.current = "break"; setPomSecsLeft(secs); setPomPhase("break");
           setTimeout(() => setPomRunning(true), 50);
         } else {
           const next = pomBlockIdx + 1;
           if (next >= activeBlocks.length) {
             playTone("session_done");
-            deadlineRef.current = null; setPomComplete(true); setPomPhase("done");
+            deadlineRef.current = null; taskDeadlineRef.current = null; setPomComplete(true); setPomPhase("done");
           } else {
             playTone("break_done");
             const blk = activeBlocks[next];
             const secs = (blk.maxMins || 40) * 60;
-            deadlineRef.current = Date.now() + secs * 1000;
             phaseRef.current = "work"; blockIdxRef.current = next;
             setPomBlockIdx(next); setPomSecsLeft(secs); setPomPhase("work");
-            setTimeout(() => setPomRunning(true), 50);
+            setTaskPromptKey(null);
+            setPomTaskIdx(0); taskIdxRef.current = 0; setPomTaskSecsLeft(null); taskDeadlineRef.current = null;
+            runCountdown(() => {
+              deadlineRef.current = Date.now() + secs * 1000;
+              startTaskTimer(next, 0);
+              setPomRunning(true);
+            });
           }
         }
       };
       const resetSession = () => {
-        clearInterval(timerRef.current); deadlineRef.current = null;
-        phaseRef.current = "work"; blockIdxRef.current = 0;
+        clearInterval(timerRef.current); clearInterval(countdownRef.current);
+        deadlineRef.current = null; taskDeadlineRef.current = null; countdownRef.current = null;
+        phaseRef.current = "work"; blockIdxRef.current = 0; taskIdxRef.current = 0;
         setPomRunning(false); setPomBlockIdx(0); setPomPhase("work"); setPomComplete(false);
         setPomSecsLeft(activeBlocks.length ? (activeBlocks[0].maxMins || 40) * 60 : null);
-        setCheckedTaskKeys({});
+        setPomTaskIdx(0); setPomTaskSecsLeft(null); setTaskPromptKey(null); setCountdown(null);
+        setCheckedTaskKeys({}); setSkippedTaskKeys({}); setCompletedBlockIds([]);
       };
       const clearSession = () => {
         try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
@@ -361,6 +478,25 @@
       };
 
       // ── Task helpers ──
+      // Derive completed task IDs from checkedTaskKeys for cross-step display
+      const completedTaskIds = React.useMemo(() => {
+        const ids = new Set();
+        Object.keys(checkedTaskKeys).forEach(key => {
+          if (!checkedTaskKeys[key]) return;
+          // key format: blockId:task-{taskId} or blockId:{splitId}
+          const after = key.split(":")[1] || "";
+          if (after.startsWith("task-")) {
+            const id = parseInt(after.replace("task-", ""));
+            if (!isNaN(id)) ids.add(id);
+          } else {
+            // splitId format like "split-{taskId}-{part}" — extract taskId
+            const m = after.match(/split-(\d+)/);
+            if (m) ids.add(parseInt(m[1]));
+          }
+        });
+        return ids;
+      }, [checkedTaskKeys]);
+
       const updateTask = (id, field, val) =>
         setTasks(prev => prev.map(t => t.id === id ? { ...t, [field]: val } : t));
       const filled = tasks.filter(t => t.text.trim());
@@ -634,17 +770,20 @@
                   <div style={{ display: "grid", gridTemplateColumns: "44px 1fr 140px", background: C.purple, padding: "10px 16px", color: "white", ...lbl, fontSize: 10 }}>
                     <span>#</span><span>Task</span><span>Est. (mins)</span>
                   </div>
-                  {tasks.map((task, idx) => (
-                    <div key={task.id} style={{ display: "grid", gridTemplateColumns: "44px 1fr 140px", borderBottom: "1px solid " + C.border, background: idx % 2 === 0 ? T.surfaceAlt : T.surfaceHover, alignItems: "center" }}>
+                  {tasks.map((task, idx) => {
+                    const done = completedTaskIds.has(task.id);
+                    return (
+                    <div key={task.id} style={{ display: "grid", gridTemplateColumns: "44px 1fr 140px", borderBottom: "1px solid " + C.border, background: idx % 2 === 0 ? T.surfaceAlt : T.surfaceHover, alignItems: "center", opacity: done ? 0.4 : 1, transition: "opacity 0.15s" }}>
                       <div style={{ padding: "8px 0 8px 16px", ...lbl, fontSize: 11, color: task.text ? T.textNum : T.textFaint }}>{task.id}</div>
                       <input value={task.text} onChange={e => updateTask(task.id, "text", e.target.value)} placeholder={"Task " + task.id + "..."}
-                        style={{ border: "none", background: "transparent", padding: "9px 12px", fontSize: 13, color: T.text, outline: "none", width: "100%" }} />
+                        style={{ border: "none", background: "transparent", padding: "9px 12px", fontSize: 13, color: T.text, outline: "none", width: "100%", textDecoration: done ? "line-through" : "none" }} />
                       <div style={{ padding: "6px 16px 6px 0" }}>
                         <input type="number" min="1" value={task.mins} onChange={e => updateTask(task.id, "mins", e.target.value)} placeholder="e.g. 15"
                           style={{ border: "1.5px solid " + (task.mins ? T.inputBorder : T.border), borderRadius: 4, padding: "5px 8px", fontSize: 12, color: T.text, width: 90, outline: "none", background: task.mins ? T.inputBg : T.surfaceAlt }} />
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: T.textDim, fontSize: 13 }}>{filled.length} task{filled.length !== 1 ? "s" : ""} entered</span>
@@ -1051,11 +1190,12 @@
                                     const bkt = getBucket(getBucketId(parseInt(item.mins)));
                                     const key = item.splitId || "task-" + item.taskId;
                                     const q   = item.quad ? quadOf(item.quad) : null;
+                                    const done = completedTaskIds.has(item.taskId);
                                     return (
                                       <div key={key}
-                                        style={{ display: "flex", alignItems: "center", gap: 6, background: bkt.bg, border: "1.5px solid " + bkt.border, borderRadius: 5, padding: "5px 8px 5px 10px" }}>
+                                        style={{ display: "flex", alignItems: "center", gap: 6, background: bkt.bg, border: "1.5px solid " + bkt.border, borderRadius: 5, padding: "5px 8px 5px 10px", opacity: done ? 0.4 : 1, transition: "opacity 0.15s" }}>
                                         {q && <div style={{ width: 8, height: 8, borderRadius: "50%", background: q.color, flexShrink: 0 }} />}
-                                        <span style={{ fontSize: 12, color: T.text }}>{item.text}</span>
+                                        <span style={{ fontSize: 12, color: T.text, textDecoration: done ? "line-through" : "none" }}>{item.text}</span>
                                         {item.splitId && <span style={{ ...lbl, fontSize: 9, color: T.splitBadgeColor, background: T.splitBadgeBg, padding: "1px 5px", borderRadius: 3 }}>{item.part}/{item.totalParts}</span>}
                                         {item.mins && <span style={{ ...lbl, fontSize: 10, color: bkt.color }}>{item.mins}m</span>}
                                         <button onClick={() => removeFromBlock(block.id, key)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8FC0", fontSize: 13, padding: 0, lineHeight: 1 }}>✕</button>
@@ -1177,28 +1317,100 @@
                       </span>
                     </div>
 
-                    {/* Timer ring */}
+                    {/* Timer rings — outer = block, inner = task */}
                     {(() => {
                       const blk       = activeBlocks[pomBlockIdx] || {};
                       const totalSecs = pomPhase === "work" ? (blk.maxMins || 40) * 60 : (blk.breakMins || 10) * 60;
-                      const elapsed   = totalSecs - (pomSecsLeft || 0);
-                      const pct       = totalSecs > 0 ? elapsed / totalSecs : 0;
-                      const R = 110, circ = 2 * Math.PI * R;
+                      const remaining = (pomSecsLeft || 0);
+                      const pctRemain = totalSecs > 0 ? remaining / totalSecs : 0;
+                      const Ro = 120, circO = 2 * Math.PI * Ro;
                       const ringColor = pomPhase === "break" ? T.timerRingBreak : pomRunning ? C.red : T.timerRingIdle;
+
+                      // Inner ring — task level
+                      const Ri = 85, circI = 2 * Math.PI * Ri;
+                      const currentTask = blk.items ? blk.items[pomTaskIdx] : null;
+                      const taskMins    = currentTask ? (parseInt(currentTask.mins) || 0) : 0;
+                      const taskTotal   = taskMins * 60;
+                      const taskRemain  = (pomTaskSecsLeft || 0);
+                      const taskPctRemain = taskTotal > 0 ? taskRemain / taskTotal : 0;
+                      const allTasksDone = blk.items && pomTaskIdx >= blk.items.length;
+                      const hasNoDuration = currentTask && taskMins === 0;
+                      const showInner   = pomPhase === "work";
+
+                      // Inner ring colour — green
+                      let innerColor = "rgba(255,255,255,0.08)";
+                      if (showInner && currentTask && taskMins > 0) {
+                        innerColor = pomRunning ? "#22C55E" : "rgba(34,197,94,0.5)";
+                      }
+
                       return (
                         <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
-                          <div style={{ position: "relative", width: 260, height: 260 }}>
-                            <svg width="260" height="260" style={{ transform: "rotate(-90deg)" }}>
-                              <circle cx="130" cy="130" r={R} fill="none" stroke={T.timerRingBg} strokeWidth="12" />
-                              <circle cx="130" cy="130" r={R} fill="none" stroke={ringColor} strokeWidth="12"
-                                strokeDasharray={(circ * pct) + " " + circ} strokeLinecap="round"
+                          <div style={{ position: "relative", width: 280, height: 280 }}>
+                            <svg width="280" height="280" style={{ transform: "rotate(-90deg)" }}>
+                              {/* Outer ring background */}
+                              <circle cx="140" cy="140" r={Ro} fill="none" stroke={T.timerRingBg} strokeWidth="10" />
+                              {/* Outer ring — remaining (drains down) */}
+                              <circle cx="140" cy="140" r={Ro} fill="none" stroke={ringColor} strokeWidth="10"
+                                strokeDasharray={(circO * pctRemain) + " " + circO} strokeLinecap="round"
                                 style={{ transition: "stroke-dasharray 0.8s ease, stroke 0.5s" }} />
+                              {/* Inner ring background */}
+                              {showInner && <circle cx="140" cy="140" r={Ri} fill="none" stroke={T.timerRingBg} strokeWidth="7" />}
+                              {/* Inner ring — remaining (drains down) */}
+                              {showInner && !allTasksDone && !hasNoDuration && (
+                                <circle cx="140" cy="140" r={Ri} fill="none" stroke={innerColor} strokeWidth="7"
+                                  strokeDasharray={(circI * taskPctRemain) + " " + circI} strokeLinecap="round"
+                                  style={{ transition: "stroke-dasharray 0.8s ease, stroke 0.5s" }} />
+                              )}
+                              {/* Greyed inner ring for no-duration tasks */}
+                              {showInner && hasNoDuration && (
+                                <circle cx="140" cy="140" r={Ri} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"
+                                  strokeDasharray={"0 " + circI} />
+                              )}
                             </svg>
                             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                              <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 900, fontSize: 56, color: T.timerText, letterSpacing: -2, lineHeight: 1 }}>{fmtTime(pomSecsLeft)}</div>
-                              <div style={{ color: T.textDim, fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
-                                {pomPhase === "work" ? (blk.maxMins || 40) + " min block" : (blk.breakMins || 10) + " min break"}
-                              </div>
+                              {countdown !== null ? (
+                                <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 900, fontSize: countdown === "GO" ? 52 : 72, color: countdown === "GO" ? "#22C55E" : T.timerText, letterSpacing: -2, lineHeight: 1, transition: "all 0.3s" }}>
+                                  {countdown}
+                                </div>
+                              ) : pomPhase === "break" ? (
+                                <>
+                                  <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 900, fontSize: 52, color: T.timerText, letterSpacing: -2, lineHeight: 1 }}>{fmtTime(pomSecsLeft)}</div>
+                                  <div style={{ color: T.textDim, fontSize: 11, marginTop: 8, fontStyle: "italic" }}>
+                                    {(blk.breakMins || 10) + " min break"}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  {/* Block time — smaller, top */}
+                                  <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 700, fontSize: 13, color: T.textDim, letterSpacing: 1, marginBottom: 2 }}>
+                                    BLOCK {fmtTime(pomSecsLeft)}
+                                  </div>
+                                  {/* Task time or status — large, centre */}
+                                  {allTasksDone ? (
+                                    <div style={{ color: T.timerText, fontSize: 10, textAlign: "center", marginTop: 6, background: T.timerRingBg, padding: "3px 10px", borderRadius: 4, maxWidth: 200, lineHeight: 1.3, fontWeight: 600 }}>
+                                      No further tasks scheduled in this block
+                                    </div>
+                                  ) : hasNoDuration ? (
+                                    <>
+                                      <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 900, fontSize: 16, color: T.textDim, letterSpacing: 0.5, marginTop: 4 }}>
+                                        No duration set
+                                      </div>
+                                      <div style={{ color: T.timerText, fontSize: 10, marginTop: 6, background: T.timerRingBg, padding: "3px 10px", borderRadius: 4, maxWidth: 160, textAlign: "center", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {currentTask.text}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div style={{ fontFamily: "'Montserrat',sans-serif", fontWeight: 900, fontSize: 42, color: T.timerText, letterSpacing: -2, lineHeight: 1 }}>
+                                        {fmtTime(pomTaskSecsLeft)}
+                                      </div>
+                                      <div style={{ color: T.timerText, fontSize: 10, marginTop: 6, background: T.timerRingBg, padding: "3px 10px", borderRadius: 4, maxWidth: 160, textAlign: "center", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>
+                                        {currentTask ? currentTask.text : ""}
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1206,7 +1418,7 @@
                     })()}
 
                     {/* Controls */}
-                    <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 16, opacity: countdown !== null ? 0.3 : 1, pointerEvents: countdown !== null ? "none" : "auto", transition: "opacity 0.3s" }}>
                       <button onClick={pauseResume} style={{ ...btnPrimary, minWidth: 130, background: pomRunning ? T.blockCard : C.red, border: pomRunning ? "1.5px solid " + T.border : "none", color: pomRunning ? T.textMid : "white" }}>
                         {pomRunning ? "⏸ PAUSE" : "▶ RESUME"}
                       </button>
@@ -1232,7 +1444,15 @@
 
                           {/* This block's tasks */}
                           <div style={{ background: T.sessionInfoBg, borderRadius: 10, border: "1px solid " + T.border, overflow: "hidden", marginBottom: 12 }}>
-                            <div style={{ padding: "10px 16px", background: T.surfaceAlt, borderBottom: "1px solid " + T.borderSubtle }}>
+                            <div style={{ padding: "10px 16px", background: T.surfaceAlt, borderBottom: "1px solid " + T.borderSubtle, display: "flex", alignItems: "center", gap: 0 }}>
+                              {pomPhase === "work" && (
+                                <>
+                                  <span style={{ ...lbl, fontSize: 10, color: "#22C55E" }}>
+                                    COMPLETED {blk.items.filter(item => { const k = blk.id + ":" + (item.splitId || "task-" + item.taskId); return !!checkedTaskKeys[k]; }).length}/{blk.items.length}
+                                  </span>
+                                  <span style={{ color: T.textFaint, margin: "0 10px", fontSize: 10 }}>|</span>
+                                </>
+                              )}
                               <span style={{ ...lbl, fontSize: 10, color: T.textDim }}>
                                 {pomPhase === "work" ? "THIS BLOCK'S TASKS" : "COMING UP AFTER YOUR BREAK"}
                               </span>
@@ -1242,20 +1462,44 @@
                               const q      = item.quad ? quadOf(item.quad) : null;
                               const itmKey = blk.id + ":" + (item.splitId || "task-" + item.taskId);
                               const ticked = !!checkedTaskKeys[itmKey];
+                              const skipped = !!skippedTaskKeys[itmKey];
                               const toggle = () => setCheckedTaskKeys(prev => ({ ...prev, [itmKey]: !prev[itmKey] }));
+                              const isActiveTask = pomPhase === "work" && i === pomTaskIdx && !skipped;
+                              const showPrompt = taskPromptKey === itmKey && !ticked && !skipped;
+                              const dimmed = ticked || skipped;
                               return (
-                                <div key={i} onClick={toggle} style={{ padding: "10px 16px", borderBottom: i < blk.items.length - 1 ? "1px solid " + T.borderSubtle : "none", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", transition: "background 0.15s", background: ticked ? T.tickedRowBg : "transparent" }}>
-                                  <div style={{ width: 18, height: 18, borderRadius: 4, border: ticked ? "none" : "2px solid " + T.checkboxBorder, background: ticked ? "#0891B2" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                                    {ticked && <span style={{ color: "white", fontSize: 11, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                                <React.Fragment key={i}>
+                                  <div onClick={toggle} style={{ padding: "10px 16px", borderBottom: (!showPrompt && i < blk.items.length - 1) ? "1px solid " + T.borderSubtle : "none", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", transition: "background 0.15s", background: ticked ? T.tickedRowBg : "transparent", opacity: skipped ? 0.5 : 1 }}>
+                                    <div style={{ width: 18, height: 18, borderRadius: 4, border: ticked ? "none" : "2px solid " + T.checkboxBorder, background: ticked ? "#0891B2" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                                      {ticked && <span style={{ color: "white", fontSize: 11, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                                    </div>
+                                    {q
+                                      ? <div style={{ width: 7, height: 7, borderRadius: "50%", background: dimmed ? "rgba(255,255,255,0.15)" : q.color, flexShrink: 0, transition: "background 0.15s" }} />
+                                      : <div style={{ width: 7, height: 7, borderRadius: "50%", background: dimmed ? "rgba(255,255,255,0.15)" : bkt.color, flexShrink: 0, transition: "background 0.15s" }} />
+                                    }
+                                    <span style={{ color: dimmed ? T.textFaint : T.text, fontSize: 13, flex: 1, textDecoration: dimmed ? "line-through" : "none", transition: "all 0.15s" }}>{item.text}</span>
+                                    {isActiveTask && (
+                                      <button onClick={e => { e.stopPropagation(); skipTask(); }} style={{ ...lbl, fontSize: 9, letterSpacing: 1, color: T.textDim, background: "rgba(255,255,255,0.06)", border: "1px solid " + T.border, borderRadius: 4, padding: "3px 10px", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+                                      >SKIP</button>
+                                    )}
+                                    {skipped && !ticked && (
+                                      <span style={{ ...lbl, fontSize: 8, letterSpacing: 1, color: "#F59E0B", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 4, padding: "2px 8px", flexShrink: 0 }}>SKIPPED</span>
+                                    )}
+                                    {item.splitId && <span style={{ ...lbl, fontSize: 9, color: dimmed ? T.textFaint : T.splitBadgeColor, background: dimmed ? "transparent" : T.splitBadgeBg, padding: "2px 6px", borderRadius: 3 }}>{item.part}/{item.totalParts}</span>}
+                                    <span style={{ ...lbl, fontSize: 10, color: dimmed ? "rgba(255,255,255,0.2)" : bkt.color, background: dimmed ? "transparent" : bkt.bg, padding: "2px 6px", borderRadius: 3, transition: "all 0.15s" }}>{item.mins}m</span>
                                   </div>
-                                  {q
-                                    ? <div style={{ width: 7, height: 7, borderRadius: "50%", background: ticked ? "rgba(255,255,255,0.15)" : q.color, flexShrink: 0, transition: "background 0.15s" }} />
-                                    : <div style={{ width: 7, height: 7, borderRadius: "50%", background: ticked ? "rgba(255,255,255,0.15)" : bkt.color, flexShrink: 0, transition: "background 0.15s" }} />
-                                  }
-                                  <span style={{ color: ticked ? T.textFaint : T.text, fontSize: 13, flex: 1, textDecoration: ticked ? "line-through" : "none", transition: "all 0.15s" }}>{item.text}</span>
-                                  {item.splitId && <span style={{ ...lbl, fontSize: 9, color: ticked ? T.textFaint : T.splitBadgeColor, background: ticked ? "transparent" : T.splitBadgeBg, padding: "2px 6px", borderRadius: 3 }}>{item.part}/{item.totalParts}</span>}
-                                  <span style={{ ...lbl, fontSize: 10, color: ticked ? "rgba(255,255,255,0.2)" : bkt.color, background: ticked ? "transparent" : bkt.bg, padding: "2px 6px", borderRadius: 3, transition: "all 0.15s" }}>{item.mins}m</span>
-                                </div>
+                                  {showPrompt && (
+                                    <div style={{ padding: "8px 16px", background: "rgba(34,197,94,0.08)", borderBottom: i < blk.items.length - 1 ? "1px solid " + T.borderSubtle : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                      <span style={{ color: T.textDim, fontSize: 11, fontStyle: "italic" }}>Has this task been completed?</span>
+                                      <button onClick={() => { setCheckedTaskKeys(prev => ({ ...prev, [itmKey]: true })); setTaskPromptKey(null); }} style={{ ...lbl, fontSize: 9, letterSpacing: 1, color: "white", background: "#22C55E", border: "none", borderRadius: 4, padding: "5px 14px", cursor: "pointer", flexShrink: 0, transition: "opacity 0.15s" }}
+                                        onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                                        onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                                      >COMPLETE TASK</button>
+                                    </div>
+                                  )}
+                                </React.Fragment>
                               );
                             })}
                           </div>
