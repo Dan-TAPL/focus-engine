@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Focus Engine — TAPL</title>
+<title>Focus Engine — TAPL</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -581,6 +581,7 @@ function App() {
   // --- Navigation ---
   const [step, setStep] = useState(0);
   const [horizonMode, setHorizonMode] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   // --- Horizon State (declared early for nav badge) ---
   const [horizonItems, setHorizonItems] = useState(() => {
@@ -621,7 +622,25 @@ function App() {
     { label: "RUN SESSION", num: "4" }
   ];
 
-  // --- Header ---
+  // --- Header with FOCUS / PLAN parent tabs ---
+  const headerTabStyle = (isActive, color) => ({
+    background: isActive ? color : "rgba(255,255,255,0.08)",
+    border: `2px solid ${color}`,
+    borderRadius: 8,
+    padding: "8px 24px",
+    cursor: "pointer",
+    ...lbl,
+    fontSize: 11,
+    color: "#FFFFFF",
+    letterSpacing: "2px",
+    transition: "all 0.2s",
+    opacity: isActive ? 1 : 0.7,
+    minWidth: 100,
+    textAlign: "center"
+  });
+
+  const horizonAlertCount = horizonItems ? horizonItems.filter(i => !i.completed && isOverdueForReview(i)).length : 0;
+
   const header = (
     <div style={{
       background: T.header,
@@ -635,38 +654,72 @@ function App() {
       top: 0,
       zIndex: 100
     }}>
-      {/* Left: logo */}
-      <div style={{ width: 80 }}>
+      {/* Left: logo + Home */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFUAAAA8CAYAAAAXDvbIAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAQxUlEQVR42u1aa5BV1ZX+1j6v+75NN7Q8BW1AQRiJUTRES9GIM0h0Mg4kJM5k1DhJnCI1arQqhUkbR8ckFZ3S+Eqc+EhLiRCTECcTjTXTGvIYUGkfrXQabwMi3U2/7uvce557r/lx74W2A4gtkMzU/ap2dd0+5+yzz7e/vdfaay2gjjrqqKOOOuqoo4466qijjjrqOAqg+sCOApiZAGhEFFZ/CwCidrnWiIjrmjtyQo9IEEQEZtaYWa82rbW1VRykj//fSq1+cK0xEanR14iIN2zYkLjkkkvWRqPR5QBMpdQ7QRBkAHQ5jpMhokxnZ2f/0qVLc4d5zzFXt/4nJq82qapKIo+9r/qx1N7ebi1evPg/Y7HYeaO6O9WyLABAIpGAlJKXLFky7Pv+O2EY7gyCYAeALtu2e5h519NPPz1ARB4AdYixaVWlyz9Lpb4PeQeDNjw8PFVKeZKUcmTKlCmd1X4MIgqGh4e/1NjY+CAAD4AxRmm1b9EONR4ppSOlHACw0/f9Hmb+g+/7OxzH6ent7X337LPPHh67Mv5kSj1S5Y0mr7e3d7ppmqfEYrGFzPwRwzDmKaVOEkKkAITMbDiOs+3dd99dDSADALFYbGlVYdqo5ftHwwEApRQLIUZPntA0Lapp2kwAM03TvGD0Q5MnTx5xHKcXQHexWFxPRBuZWRxGAMdEqdTe3q5dcMEFh1Oe6O3tnRGLxebqun66rut/IYQ4TSl1EhGlmFkCGACwIwzDTgDbstlsl2EYOwE0NzQ0/EAIMfWtt96av2jRopLrui9ZlnUmAHk4RR5u/se0Q6o7m81+q7Gx8WsfhtgPzigdmIvW1laxc+fOWcVi8eJCoXCz67ptjuN0+L4/5Hle6Hme63neO+Vy+b/L5fI92Wz26qGhocWdnZ2Nh3tHa2urGYahm8/nrwIAz/OGmJmllIrfB0q97y1j71XMLJk5qDbu7e09c5RhO7ZGpuaWFIvFNY7jbKuSJx3HCTzP21MqlV4sl8v3ZrPZLwwNDZ3z9ttvN79Pn3+0BXV3d1sAUCqVNpfL5e+3tbWlamQqpZhrTcpqCyt/D4ba9SMnOmBmZdv22kON72jvqUREyrbtpyzLWhUEwfdLpdL9RPRqV1fXjnPOOacwjv7CrVu3zpgRN1KxdEPKJtObNm3aNmYmz/PetCxrzkUXXfQRIQQBkESkjXp67AyBWaFYKiMWjULXdUCI96x/OnI7ERxzQ8XMGhHJkZGRy+Px+KodO3acMXfu3I7a9Zdffjmd2bz5xFhjY9I0zVSoaSnSkIJupaKJRFwzjDSIJkjmFKScODw83DZr1qynM5nM3GlTp75iRiIJAhD1fW93d/dpAHry+XynbdsXGoaxEACUlEAYAJ4LdstQZRsoFcGeB2pqhjZzNog0tD3+OHK5HNbecgsKD90JteW34FwO+rnnIXnjnYBS7yH7IBMN27a7AeCFF144pktfBwDHcZ4slUovVv8Xa29v1wcHB+/yPK8QMpeq+9P7olgs3k5EyOfztzMz223fC4r33eYzM+cLhXUA8Jvf/GbpihUr9n33299qY2bOf+ur4dBHZ/DQxybz0OkJHpxn8OBs8ODJ4MFTLB65chkHPV3sBgH/YtPPWDFz7h9X8EAKPDABnPv8J6pbQnjYbVZKqfr7+xeOd0/Vx2GkPCEEV1+mli5dGuZyOTZNM+n8Yr3i3btIlXOs8iPMxQJzMc9czIHdMng4D5pyQtiw4feGGYkQMyOaSl2J/j1c+toagSLIOP1sFT932Wd6O7fd8Wbf8Dbf961dO3ctBwAu5gRn9oAmVXwACketaSOA/NWvkN+xFBM2vYTll11ecUGmzAClNJABcBgcfNt4r4dAUspcT0/P3tFu2jElNQiC10zTXEZEipnDil8YDAHg8j2tUm7tJpEEQYLAVY+SANIrbju7eQghNKVgZF763WIDmGk/9bASLAQ1Cdjfvkk1nbtMazj51O9cvCC24rzzztvnB/5cAEqbOFn4EQEydMAk0PRZEIk0WErIN14BNVvgTB/se29F8o6HK45zPAmEEjAAtgsV1kgcllSl1LtLlizJjvcQ8EGkXev8NQCT2tvbJ9aiRUIiB4BEQyORAoEAigDUaIDSOiipgSMCKmWwtKJQSskwCJLN80+/FgB7m9oU6QqICqiXXtecZ9apaDR6KTN/ZN++fb8Ng5ABKC3ZUPH/PR80ZQYannkdDT/egoafvgzrqn8Gj3igBkL461+CS8WKKBPp/R4pl21Ayf1GbSyUUlxd8pnq947LnTrih2699VYGgL6+vm5m1hYuXNiy/4gkRBaAtD71Dypy000c/ebd0JdfAbZDwAtB02Yh/bNtmPTrHmp+sYeFEBp7zl9Zsdhfy63tpP6wS0NUA6SEiBDKd93CCAMG8C9Syh2O61AAQEs3HHDZnRLguUAQgMIQ1qWrKutOAJzPQmWHKrcm0xU1CABOGey5hyZDCK6uxsyHORx9YFJfffXVPiFEVtO0hfu3BKISAC22+otm8uvfofhV18O8+HKwzxWFMLNx6ulwT5i+78UtrxgdHR2/jUYiQwYwsfij7ylSRBACrBQQ06C6dmn2uvsJwF9+8ZqrP97X188eoIlUQ+UzBcCuA1gRwDAAXUeY2Q6E1QGZJigS209q7QDN7uFJHYXtxyVKRURcPbZJx3F2G4axqOZqZTKZrUEQXKHK5RFvX6+YdvaSn5pWJMUEBoG4kJNQSs8PDb3wuVUru/f29a1j5vuQG0L4wrNMFoMam2FdfSPc226ASBCc+/8V8Suu1v7m05+59Nlnn0O55CCengAWAEgArgPniftBugE12AfvqYdBCR0oS4iPLoBoat5PKgkAQoA9F+yUgYYmgNUBTR0wXAIA8vl8z3iN1HgMlagGNd7QdX2/UmfPnj0A4Cf7lctc1CZMTKEauWTPJagA6YnNib19fd/gcuHjAD5R/snjCiOOBgFoC89C/KrrEWxqg3q1A7RnEMWHv42W6+/giy+6kPb19aG5obF6UifA9+B844b9QTxKEqAYKgTiX74FIIIXSmiphgOne9+rbBuVEMvBbIaQUgZSyp0fhtRxbcRhGL4KYE51H5LV42stwq4TYCOVBglU1r/nAqUidIEkAGFL+iIAdp5+RJEFsEawPn0tCEDkK98EswClBLxH74Ua7KPPXfMFxCMRwIqCDFRUJgijzlZQeYY0kojc/SAi512CH69fj+2ZDIyJk6Bq9wUKynMrERXXgSrmIYcHKoeBKoFhGA5u3bq1/3gqtfbi1y3Lmrhly5amWhySiMJqGgNrb73V1pJpQK8OKlCEUhGUnmj+tLU1FUkkLpOvbyH5xluaFhMgIrj//l04D94BlGxQouKH0YCN0n23YcY3H6xM5p4ekGUAYQgOAf38i6C1zAPF0zBObIF1yeVAqhGvdXTgrn+7Gw8+8hjQmAZ0AphBmoB9w2dBmgYu22C7BEQsNGzqgDZhYo3A3atWrXI+TEx1XKQWi8WuaDSqt7S0zAYwXEuBKKUEEakAKBnJFGCIyiMhgLINCeDsz6z8tA6k8088IIUPDUkdkCHC9nZUdQ2YlTA0pTV4Tz4C6+/WwGyZB7IiICsKhEXABaLX3gzr3GWVeQPw+5dfgXLeRK5QQKFQhO+6QGwaEIsDjgPoBO7afmA7lQBbAEo2UCVVSvl2zanBAdN3TJc/A8CNN97YT0RZ0zQXjumHAICkKiCeBCwLAIMViLMjYGBK4sST/gnlIgf/9XOipADCAOwpcJwUN1iSm1MhT52qYFqAbgCOhHP/bQARKBIFrCigGBww0L8Hngxx7ef/Hldcuhy/eubnmL9gASZPngwiQrFYAKJxKKcEOSIhiyEkAGkCMmpCNiYgm5ohA390hqD7uOaoRnsAbW1tu4QQiw4W9FahzMOKQMQSjCCAEEz+0ABMYKYVi8F58iFgT44QB9CQQPKxTWzNPFkglQaiMUAzUHriAS59eQ1REnAfewrW6utgnnkulBBgCaioBen7MDUdF168DAsXLcKCBQsqH6XrEJqGUqEACB2p7z4B04pCm9AISqSAZBqIJ4BYArBi7xm7lLLrT5H4EwAUM3eO8gDG7D0qBwbYdZkHQ1YOEA71swUFpZidX24ET4gDVpTNv72SrY9daAQV33CPHwR5TcnT46u/NJc9j41olCk2QZjTZgBCYNL6XwOGWSWmclpafeWVNQMKTdOQTCZhmibKtl1h65OfhQPALTkol0oo2UXYQ30o20UMDgzgtFNPxfz584VSCoVCYVftI457jkop1SGEWFbzAN6ThGIeAYFjX79HaMykp5qgnbGYAAEhgMYfbAJMExBmxdNxHf/5Rx/7+IrrrssCQGdn5+JTTjllS+yaG6EA4QHStkuas3cvHERQypWQ69mLqGFg8VlnQkoJIoIQFaOn6zqEEHj4hz/Ek+vXo1QsIAgChEEIqWTlhEoE0zRhl2ysWfMVnj9/Pvm+X/Q8b/eHsfzjJZWrIcDOZDLZ1NnZ2bhgwYKR0YUKQRDYkUiErCuukgz4DDgBUKIwLCqlitJMlFQYFImDEQ79gu/7W1dcd122Gl5kItra/eabZySYvZtvv32t5/uf7du3T4VSijDwmRnScRyctXgxnfnII1RD7f3pdBqrVq2CpmmIxWJIJpNIpVJIJBKIx+P7WzQaRSQSQTQaZQDEzH3r1q0bHpsyOuZobW0VAPDOO+9Mc11X9ff3nwMAGzZs0GrE7ty5c3I2m12045Xfze7YsGHaf9x554R71qyxjqQCperzjvbMzdWrV6995plnyps3b+bOzk4eGBjgcrl8sFhoOCrPFFbzTkcS3w2ZWbmu++xxyUsdKgO7cuVKzXXdEdu2r/kguZwaadXDgsnMEWa2xhA59plPVj9+OTMvYeYvMPOdUsqnXdftCIJgIAwPHXgOgkAFQRAGQRCEYRiEFSgppZKV3JbLzJzL5b4z3rzU0cgCCABwXfflYrF4f+1ENZq4qnIFM2vt7e21mibjcOQBQFdX18T+/v6PFQqFa23bvs9xnC3MzENDQ2sP9Uwmk0nv3r37NNu2l2ez2RvK5fIDrus+7/v+jiAI7CPJRPi+P7R9+/ZZzEy11XhcK1SYWSeisFQqrdM0bWokElnKzObGjRvlypUra33y4cpn9u7dO1HTtDnpdHq+lPIMXdcXENFsZp5ERIKZ8wB6pJRvlEqlR5ubmzePmpD976gekw/6jvPPP19/6KGHmhOJxIlNTU0nBUEwLxqNnqyUmiOEmEFEk4hIBkHw0vDw8FemT5/ecTRy/eOSeS0ZFobhL03T/NHzzz/fRETDB7u3u7t7UjqdnhOPx+cz8xmGYZwGYA4RNVUcBc7rur5TSvkWgJ8FQfDG8PBwd0tLy7uj3Zqaf/wBq2TCefPm9QLoBfA/o5957rnn4vPmzZvCzGrmzJk9NXtxNIonxl2hwsy0ceNG/bLLLvudEOKEYrH4Vd/398Xj8VOIaJFpmvOZeY4QoqmqsBwz18jrcByn03XdP0yfPn0vDl0wVqvQ4/EUjdWM38aNG8XoFVQl/GDFcOqoGZ3xFlYIIfi1116b0NLScp+maZ+qFpPliahHKfWWUqrDcZw3HcfpmjFjRu8RkPee8pxjWbw7St04bqU9H0QJ1XRyMpPJnHC4iaoarv2FuNXf/6equY8bsWMt+ljyjmcV858D6Fiotl5zX0cdddRRRx111FFHHXXUUUcdfzb4Xwbg9HF4G7ghAAAAAElFTkSuQmCC" alt="TAPL" style={{ height: 40 }} />
+        <button onClick={() => setShowLanding(true)} style={{
+          background: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 6,
+          padding: "6px 12px",
+          cursor: "pointer",
+          ...lbl,
+          fontSize: 9,
+          color: "#FFFFFF",
+          letterSpacing: "1px",
+          transition: "all 0.2s",
+          opacity: 0.7
+        }}>
+          ⌂ HOME
+        </button>
       </div>
-      {/* Center: title + subtitle */}
-      <div style={{ textAlign: "center" }}>
-        <div style={{ ...lbl, fontSize: 18, color: "#FFFFFF", letterSpacing: "3px" }}>
-          THE FOCUS ENGINE
+      {/* Center: FOCUS + title + PLAN */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flex: 1 }}>
+        <button onClick={() => { setHorizonMode(false); }} style={headerTabStyle(!horizonMode, C.red)}>
+          FOCUS
+        </button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ ...lbl, fontSize: 18, color: "#FFFFFF", letterSpacing: "3px" }}>
+            FOCUS ENGINE
+          </div>
+          <div style={{ ...lbl, fontSize: 9, color: C.red, letterSpacing: "2px", marginTop: 2 }}>
+            THE ADHD PERFORMANCE LAB
+          </div>
         </div>
-        <div style={{ ...lbl, fontSize: 9, color: C.red, letterSpacing: "2px", marginTop: 2 }}>
-          THE ADHD PERFORMANCE LAB
-        </div>
+        <button onClick={() => setHorizonMode(true)} style={{ ...headerTabStyle(horizonMode, C.teal), position: "relative" }}>
+          PLAN
+          {horizonAlertCount > 0 && !horizonMode && (
+            <span style={{
+              position: "absolute", top: -6, right: -6,
+              width: 16, height: 16, borderRadius: "50%",
+              background: C.red, color: "#FFF",
+              fontSize: 9, fontWeight: 900,
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>{horizonAlertCount}</span>
+          )}
+        </button>
       </div>
       {/* Right: theme toggle */}
-      <button onClick={() => setDark(!dark)} style={{
-        background: "rgba(255,255,255,0.1)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        borderRadius: 6,
-        padding: "6px 14px",
-        cursor: "pointer",
-        ...lbl,
-        fontSize: 10,
-        color: "#FFFFFF",
-        letterSpacing: "1px"
-      }}>
-        {dark ? "☀ LIGHT" : "● DARK"}
-      </button>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <button onClick={() => setDark(!dark)} style={{
+          background: "rgba(255,255,255,0.1)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 6,
+          padding: "6px 14px",
+          cursor: "pointer",
+          ...lbl,
+          fontSize: 10,
+          color: "#FFFFFF",
+          letterSpacing: "1px"
+        }}>
+          {dark ? "☀ LIGHT" : "● DARK"}
+        </button>
+      </div>
     </div>
   );
 
-  // --- Step Navigation Bar ---
-  const stepNav = (
+  // --- Step Navigation Bar (only shown in Focus mode) ---
+  const stepNav = !horizonMode ? (
     <div style={{
       display: "flex",
       background: T.card,
@@ -678,9 +731,9 @@ function App() {
       height: 48
     }}>
       {STEPS.map((s, i) => {
-        const active = !horizonMode && step === i;
+        const active = step === i;
         return (
-          <button key={i} onClick={() => { setStep(i); setHorizonMode(false); }} style={{
+          <button key={i} onClick={() => { setStep(i); }} style={{
             flex: 1,
             padding: "10px 4px",
             background: active ? C.red : "transparent",
@@ -699,35 +752,8 @@ function App() {
           </button>
         );
       })}
-      <button onClick={() => setHorizonMode(true)} style={{
-        flex: 1,
-        padding: "10px 4px",
-        background: horizonMode ? C.teal : "transparent",
-        border: "none",
-        borderLeft: `1px solid ${T.border}`,
-        borderBottom: horizonMode ? `3px solid ${C.teal}` : "3px solid transparent",
-        cursor: "pointer",
-        transition: "all 0.15s",
-        opacity: horizonMode ? 1 : 0.6
-      }}>
-        <div style={{ ...lbl, fontSize: 9, color: horizonMode ? "#FFFFFF" : C.teal, letterSpacing: "1px", position: "relative", display: "inline-block" }}>
-          ◎
-          {horizonItems && horizonItems.filter(i => !i.completed && isOverdueForReview(i)).length > 0 && !horizonMode && (
-            <span style={{
-              position: "absolute", top: -4, right: -10,
-              width: 14, height: 14, borderRadius: "50%",
-              background: C.red, color: "#FFF",
-              fontSize: 8, fontWeight: 900,
-              display: "flex", alignItems: "center", justifyContent: "center"
-            }}>{horizonItems.filter(i => !i.completed && isOverdueForReview(i)).length}</span>
-          )}
-        </div>
-        <div style={{ ...lbl, fontSize: 10, color: horizonMode ? "#FFFFFF" : C.teal, letterSpacing: "1px", marginTop: 2 }}>
-          HORIZON
-        </div>
-      </button>
     </div>
-  );
+  ) : null;
 
   // --- Step 1: Brain Dump ---
   const renderBrainDump = () => (
@@ -1233,7 +1259,7 @@ function update() {
   let html = "<div style='padding:12px'>";
   // Header
   html += "<div style='text-align:center;margin-bottom:8px'>";
-  html += "<div class='lbl' style='font-size:8px;color:"+C.red+";letter-spacing:2px'>THE FOCUS ENGINE</div>";
+  html += "<div class='lbl' style='font-size:8px;color:"+C.red+";letter-spacing:2px'>FOCUS ENGINE</div>";
   if (isIdle) {
     html += "<div style='font-size:11px;color:"+dim+";margin-top:12px'>"+( d.phase==="countdown" ? "Starting..." : "No active session")+"</div>";
   } else if (isDone) {
@@ -3463,7 +3489,95 @@ update();
     );
   };
 
+  // --- Landing Page ---
+  const renderLanding = () => (
+    <div style={{
+      background: T.bg,
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 40,
+      transition: "background 0.2s"
+    }}>
+      {/* Logo + title */}
+      <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <div style={{ ...lbl, fontSize: 28, color: T.text, letterSpacing: "4px" }}>
+          FOCUS ENGINE
+        </div>
+        <div style={{ ...lbl, fontSize: 11, color: C.red, letterSpacing: "2px", marginTop: 8 }}>
+          THE ADHD PERFORMANCE LAB
+        </div>
+      </div>
+      {/* Two large tiles */}
+      <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center" }}>
+        {/* FOCUS tile */}
+        <button onClick={() => { setHorizonMode(false); setStep(0); setShowLanding(false); }} style={{
+          width: 220,
+          height: 220,
+          background: T.card,
+          border: `3px solid ${C.red}`,
+          borderRadius: 16,
+          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          transition: "all 0.2s",
+          padding: 24
+        }}>
+          <div style={{ fontSize: 36 }}>🎯</div>
+          <div style={{ ...lbl, fontSize: 18, color: C.red, letterSpacing: "3px" }}>FOCUS</div>
+          <div style={{ fontSize: 12, color: T.textDim, textAlign: "center", lineHeight: 1.5, fontFamily: "Montserrat, sans-serif" }}>
+            What do I need to do today?
+          </div>
+        </button>
+        {/* PLAN tile */}
+        <button onClick={() => { setHorizonMode(true); setShowLanding(false); }} style={{
+          width: 220,
+          height: 220,
+          background: T.card,
+          border: `3px solid ${C.teal}`,
+          borderRadius: 16,
+          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          transition: "all 0.2s",
+          padding: 24
+        }}>
+          <div style={{ fontSize: 36 }}>🗺️</div>
+          <div style={{ ...lbl, fontSize: 18, color: C.teal, letterSpacing: "3px" }}>PLAN</div>
+          <div style={{ fontSize: 12, color: T.textDim, textAlign: "center", lineHeight: 1.5, fontFamily: "Montserrat, sans-serif" }}>
+            What's coming up this week, month, or quarter?
+          </div>
+        </button>
+      </div>
+      {/* Theme toggle at bottom */}
+      <button onClick={() => setDark(!dark)} style={{
+        marginTop: 48,
+        background: "rgba(255,255,255,0.05)",
+        border: `1px solid ${T.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        ...lbl,
+        fontSize: 10,
+        color: T.textDim,
+        letterSpacing: "1px"
+      }}>
+        {dark ? "☀ LIGHT" : "● DARK"}
+      </button>
+    </div>
+  );
+
   // --- Main render ---
+  if (showLanding) return renderLanding();
+
   return (
     <div style={{ background: T.bg, minHeight: "100vh", transition: "background 0.2s" }}>
       {header}
