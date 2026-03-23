@@ -505,6 +505,61 @@ function exportTasksCSV(tasks) {
   URL.revokeObjectURL(url);
 }
 
+// Combined CSV Export — all Launch tasks + all Horizon items in one file
+function exportAllCSV(tasks, horizonItems) {
+  const esc = (s) => '"' + (s || "").replace(/"/g, '""') + '"';
+  const headers = ["Source", "Name", "Minutes", "Quadrant", "Type", "Due Date", "Radar Tier", "Date Status", "Size", "Status", "Chunks Done", "Chunks Total", "Source Project"];
+  const rows = [];
+
+  // Launch tasks
+  tasks.filter(t => (t.text || "").trim()).forEach((t, i) => {
+    rows.push([
+      "Launch", esc(t.text), t.minutes || "", t.quadrant || "",
+      "task", "", "", "", "",
+      "", "", "", t.promotedFrom || ""
+    ]);
+  });
+
+  // Horizon items
+  horizonItems.forEach(item => {
+    const tier = item.dueDate ? getRadarTier(item.dueDate) : "someday";
+    const chunksDone = item.chunks ? item.chunks.filter(c => c.done).length : 0;
+    const chunksTotal = item.chunks ? item.chunks.length : 0;
+    const status = item.completed ? "Completed" : item.promoted ? "Promoted" : "Active";
+    rows.push([
+      "Horizon", esc(item.name), "", "",
+      item.type || "task", item.dueDate || "", tier,
+      item.dateConfirmed ? "Confirmed" : "Suggested",
+      item.size || "", status,
+      chunksTotal > 0 ? chunksDone : "", chunksTotal > 0 ? chunksTotal : "",
+      ""
+    ]);
+    // Add chunks as sub-rows for projects
+    if (item.type === "project" && item.chunks && item.chunks.length > 0) {
+      item.chunks.forEach(chunk => {
+        rows.push([
+          "Horizon (chunk)", esc(chunk.name), "", "",
+          "chunk", item.dueDate || "", tier,
+          "", "", chunk.done ? "Done" : "Pending",
+          "", "", esc(item.name)
+        ]);
+      });
+    }
+  });
+
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const date = new Date().toISOString().split("T")[0];
+  a.download = "focus-engine-full-export-" + date + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // CSV Import — reads a CSV and returns task objects
 function parseCSV(csvText) {
   const lines = csvText.split("\n").filter(l => l.trim());
@@ -699,8 +754,21 @@ function App() {
           )}
         </button>
       </div>
-      {/* Right: theme toggle */}
-      <div style={{ display: "flex", alignItems: "center" }}>
+      {/* Right: export + theme toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={() => exportAllCSV(tasks, horizonItems)} style={{
+          background: "rgba(255,255,255,0.1)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 6,
+          padding: "6px 14px",
+          cursor: "pointer",
+          ...lbl,
+          fontSize: 10,
+          color: "#FFFFFF",
+          letterSpacing: "1px"
+        }}>
+          ↓ CSV
+        </button>
         <button onClick={() => setDark(!dark)} style={{
           background: "rgba(255,255,255,0.1)",
           border: "1px solid rgba(255,255,255,0.2)",
@@ -957,7 +1025,8 @@ function App() {
   const [hzCaptureStep, setHzCaptureStep] = useState(0);
   const [hzCaptureData, setHzCaptureData] = useState({});
   const [hzEditId, setHzEditId] = useState(null);
-  const [hzPromoteModal, setHzPromoteModal] = useState(null); // {itemId} for promote-to-brain-dump
+  const [hzPromoteModal, setHzPromoteModal] = useState(null); // itemId for promote-to-brain-dump
+  const [hzPromoteSelection, setHzPromoteSelection] = useState(new Set()); // selected chunk IDs for selective promote
 
   useEffect(() => { saveHorizon(horizonItems); }, [horizonItems]);
 
@@ -981,12 +1050,27 @@ function App() {
     return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
   };
 
-  const promoteTobrainDump = (itemId) => {
+  const promoteTobrainDump = (itemId, selectedChunkIds) => {
     const item = horizonItems.find(i => i.id === itemId);
     if (!item) return;
-    const newTasks = getPromotableTasks(item);
     const sourceName = item.name;
     const sourceColor = getProjectColor(sourceName);
+
+    let newTasks;
+    if (item.type === "task") {
+      newTasks = [{ text: item.name, minutes: "", chunkId: null }];
+    } else if (selectedChunkIds && selectedChunkIds.size > 0) {
+      // Selective: only promote chosen chunks
+      newTasks = item.chunks
+        .filter(c => selectedChunkIds.has(c.id) && !c.done)
+        .map(c => ({ text: c.name, minutes: "", chunkId: c.id }));
+    } else {
+      // Promote all undone chunks
+      newTasks = item.chunks
+        .filter(c => !c.done)
+        .map(c => ({ text: c.name, minutes: "", chunkId: c.id }));
+    }
+
     setTasks(prev => {
       const next = [...prev];
       for (const nt of newTasks) {
@@ -997,14 +1081,19 @@ function App() {
             text: nt.text,
             minutes: nt.minutes || "",
             promotedFrom: sourceName,
-            promotedColor: sourceColor
+            promotedColor: sourceColor,
+            horizonItemId: itemId,
+            horizonChunkId: nt.chunkId
           };
         }
       }
       return next;
     });
-    updateHorizonItem(itemId, { promoted: true });
+    if (item.type === "task") {
+      updateHorizonItem(itemId, { promoted: true });
+    }
     setHzPromoteModal(null);
+    setHzPromoteSelection(new Set());
     setHorizonMode(false);
     setStep(0);
   };
@@ -1039,42 +1128,52 @@ function App() {
     setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, taskIds: [] } : b));
   };
 
-  // Timer tick
+  // Timer tick — uses deadline for accuracy even when tab is backgrounded
   useEffect(() => {
     if (phase !== "work" && phase !== "break") return;
     if (paused) return;
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          if (phase === "work") {
-            // Block work phase complete
-            if (soundsOn) AudioEngine.playBlockComplete();
-            sendNotification("Block Complete", "Great work! Time for a break. Step away from the screen.");
-            setCompletedBlockIds(prev => new Set([...prev, currentBlock.id]));
-            if (currentBlockIdx < runnableBlocks.length - 1) {
-              setPhase("break");
-              setTimeLeft(currentBlock.breakMins * 60);
-              if (soundsOn) AudioEngine.playBreakStart();
-            } else {
-              setPhase("done");
-              if (soundsOn) AudioEngine.playSessionComplete();
-              sendNotification("Session Complete", "All blocks finished. Outstanding work!");
-            }
-          } else if (phase === "break") {
-            // Break complete, start next block
-            sendNotification("Break Over", "Time to focus. Next block starting now.");
-            setCurrentBlockIdx(prev => prev + 1);
-            setTaskTimeOffset(0);
-            setPhase("countdown");
-            setCountdownNum(3);
+    // Set deadline if not already set
+    if (!deadlineRef.current) {
+      deadlineRef.current = Date.now() + timeLeft * 1000;
+    }
+
+    const tick = () => {
+      const remaining = Math.round((deadlineRef.current - Date.now()) / 1000);
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        deadlineRef.current = 0;
+        setTimeLeft(0);
+        if (phase === "work") {
+          if (soundsOn) AudioEngine.playBlockComplete();
+          sendNotification("Block Complete", "Great work! Time for a break. Step away from the screen.");
+          setCompletedBlockIds(prev => new Set([...prev, currentBlock.id]));
+          if (currentBlockIdx < runnableBlocks.length - 1) {
+            setPhase("break");
+            const breakSecs = currentBlock.breakMins * 60;
+            deadlineRef.current = Date.now() + breakSecs * 1000;
+            setTimeLeft(breakSecs);
+            if (soundsOn) AudioEngine.playBreakStart();
+          } else {
+            setPhase("done");
+            if (soundsOn) AudioEngine.playSessionComplete();
+            sendNotification("Session Complete", "All blocks finished. Outstanding work!");
           }
-          return 0;
+        } else if (phase === "break") {
+          sendNotification("Break Over", "Time to focus. Next block starting now.");
+          setCurrentBlockIdx(prev => prev + 1);
+          setTaskTimeOffset(0);
+          setPhase("countdown");
+          setCountdownNum(3);
+          deadlineRef.current = 0;
         }
-        return prev - 1;
-      });
-    }, 1000);
+      } else {
+        setTimeLeft(remaining);
+      }
+    };
+
+    timerRef.current = setInterval(tick, 250); // tick 4x/sec for responsiveness
+    tick(); // immediate first tick
 
     return () => clearInterval(timerRef.current);
   }, [phase, paused, currentBlockIdx]);
@@ -1108,12 +1207,14 @@ function App() {
     setCompletedBlockIds(new Set());
     setTaskPrompt(null);
     setPaused(false);
+    deadlineRef.current = 0;
     setPhase("countdown");
     setCountdownNum(3);
   };
 
   const resetSession = () => {
     clearInterval(timerRef.current);
+    deadlineRef.current = 0;
     setPhase("idle");
     setSessionActive(false);
     setPaused(false);
@@ -1128,6 +1229,7 @@ function App() {
 
   const resetBlock = () => {
     clearInterval(timerRef.current);
+    deadlineRef.current = 0;
     // Clear completed/skipped for tasks in current block only
     if (currentBlock) {
       const blockTaskSet = new Set(currentBlock.taskIds);
@@ -1159,7 +1261,9 @@ function App() {
     if (currentBlock && currentTaskInfo && currentTaskInfo.task) {
       const taskStart = taskStartTime(currentBlock, currentTaskInfo.task.id, tasks);
       const blockSecs = blockWorkSeconds(currentBlock, tasks);
-      setTimeLeft(blockSecs - taskStart);
+      const newTimeLeft = blockSecs - taskStart;
+      setTimeLeft(newTimeLeft);
+      deadlineRef.current = Date.now() + newTimeLeft * 1000;
     }
   };
 
@@ -1203,11 +1307,14 @@ function App() {
 
   const skipPhase = () => {
     clearInterval(timerRef.current);
+    deadlineRef.current = 0;
     if (phase === "work") {
       setCompletedBlockIds(prev => new Set([...prev, currentBlock.id]));
       if (currentBlockIdx < runnableBlocks.length - 1) {
+        const breakSecs = currentBlock.breakMins * 60;
         setPhase("break");
-        setTimeLeft(currentBlock.breakMins * 60);
+        setTimeLeft(breakSecs);
+        deadlineRef.current = Date.now() + breakSecs * 1000;
         if (soundsOn) AudioEngine.playBreakStart();
       } else {
         setPhase("done");
@@ -1228,6 +1335,16 @@ function App() {
     setCompletedTaskIds(prev => new Set([...prev, taskId]));
     setTaskPrompt(null);
     if (soundsOn) AudioEngine.playTaskComplete();
+    // Sync back to Horizon: mark the chunk as done if this was a promoted task
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.horizonItemId && task.horizonChunkId) {
+      const hItem = horizonItems.find(i => i.id === task.horizonItemId);
+      if (hItem && hItem.chunks) {
+        updateHorizonItem(task.horizonItemId, {
+          chunks: hItem.chunks.map(c => c.id === task.horizonChunkId ? { ...c, done: true } : c)
+        });
+      }
+    }
   };
 
   const skipTask = (taskId) => {
@@ -1318,7 +1435,7 @@ function update() {
   html += "</div>";
   document.getElementById("r").innerHTML = html;
 }
-setInterval(update, 500);
+setInterval(update, 250);
 update();
 <\/script></body></html>`);
     popup.document.close();
@@ -2567,7 +2684,7 @@ update();
 
         {/* Controls */}
         <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 10 }}>
-          <button onClick={() => setPaused(!paused)} style={{
+          <button onClick={() => { if (!paused) { deadlineRef.current = 0; } setPaused(!paused); }} style={{
             background: C.red, color: "#FFF", border: "none", borderRadius: 6,
             padding: "10px 24px", cursor: "pointer", ...lbl, fontSize: 11
           }}>{paused ? "▶ RESUME" : "⏸ PAUSE"}</button>
@@ -3248,6 +3365,24 @@ update();
                         }}>PROMOTED</span>
                       )}
                     </div>
+                    {/* Progress bar for projects */}
+                    {chunksTotal > 0 && chunksDone > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{
+                          height: 6, borderRadius: 3, background: T.border + "44", overflow: "hidden"
+                        }}>
+                          <div style={{
+                            height: "100%", borderRadius: 3,
+                            background: chunksDone === chunksTotal ? C.green : C.teal,
+                            width: `${(chunksDone / chunksTotal) * 100}%`,
+                            transition: "width 0.3s"
+                          }} />
+                        </div>
+                        {chunksDone === chunksTotal && (
+                          <div style={{ ...lbl, fontSize: 8, color: C.green, marginTop: 4, letterSpacing: "1px" }}>ALL STEPS COMPLETE</div>
+                        )}
+                      </div>
+                    )}
                     {chunksTotal > 0 && item.chunks && (
                       <div style={{ marginTop: 6 }}>
                         {item.chunks.map(chunk => (
@@ -3261,7 +3396,14 @@ update();
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <button onClick={() => promoteTobrainDump(item.id)} style={{
+                      <button onClick={() => {
+                        if (item.type === "project" && item.chunks && item.chunks.filter(c => !c.done).length > 0) {
+                          setHzPromoteModal(item.id);
+                          setHzPromoteSelection(new Set());
+                        } else {
+                          promoteTobrainDump(item.id);
+                        }
+                      }} style={{
                         padding: "4px 10px", borderRadius: 4, cursor: "pointer",
                         background: C.red + "15", border: `1px solid ${C.red}44`, ...lbl, fontSize: 8, color: C.red
                       }}>▶ PROMOTE</button>
@@ -3492,6 +3634,85 @@ update();
             </div>
           );
         })}
+
+        {/* Promote Selection Modal */}
+        {hzPromoteModal && (() => {
+          const modalItem = horizonItems.find(i => i.id === hzPromoteModal);
+          if (!modalItem || !modalItem.chunks) return null;
+          const undoneChunks = modalItem.chunks.filter(c => !c.done);
+          const allSelected = undoneChunks.length > 0 && undoneChunks.every(c => hzPromoteSelection.has(c.id));
+          return (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 200
+            }} onClick={() => { setHzPromoteModal(null); setHzPromoteSelection(new Set()); }}>
+              <div style={{
+                background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+                padding: 24, maxWidth: 420, width: "90%", maxHeight: "80vh", overflowY: "auto"
+              }} onClick={e => e.stopPropagation()}>
+                <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 4 }}>PROMOTE TO LAUNCH</div>
+                <div style={{ fontSize: 11, color: T.textDim, marginBottom: 16 }}>
+                  Select which tasks from <strong style={{ color: T.text }}>{modalItem.name}</strong> to promote to today's Brain Dump.
+                </div>
+                {/* Select all toggle */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "8px 0",
+                  borderBottom: `1px solid ${T.border}`, marginBottom: 8
+                }}>
+                  <input type="checkbox" checked={allSelected} onChange={() => {
+                    if (allSelected) {
+                      setHzPromoteSelection(new Set());
+                    } else {
+                      setHzPromoteSelection(new Set(undoneChunks.map(c => c.id)));
+                    }
+                  }} style={{ cursor: "pointer" }} />
+                  <span style={{ ...lbl, fontSize: 10, color: T.textDim }}>SELECT ALL ({undoneChunks.length} remaining)</span>
+                </div>
+                {/* Chunk list */}
+                {undoneChunks.map(chunk => (
+                  <div key={chunk.id} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
+                    borderBottom: `1px solid ${T.border}22`
+                  }}>
+                    <input type="checkbox" checked={hzPromoteSelection.has(chunk.id)} onChange={() => {
+                      setHzPromoteSelection(prev => {
+                        const next = new Set([...prev]);
+                        if (next.has(chunk.id)) next.delete(chunk.id);
+                        else next.add(chunk.id);
+                        return next;
+                      });
+                    }} style={{ cursor: "pointer" }} />
+                    <span style={{ fontSize: 12, color: T.text }}>{chunk.name}</span>
+                  </div>
+                ))}
+                {/* Done chunks (greyed, not selectable) */}
+                {modalItem.chunks.filter(c => c.done).map(chunk => (
+                  <div key={chunk.id} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "6px 0",
+                    opacity: 0.3
+                  }}>
+                    <input type="checkbox" checked disabled style={{ cursor: "default" }} />
+                    <span style={{ fontSize: 12, color: T.textDim, textDecoration: "line-through" }}>{chunk.name}</span>
+                  </div>
+                ))}
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                  <button onClick={() => promoteTobrainDump(hzPromoteModal, hzPromoteSelection)} disabled={hzPromoteSelection.size === 0} style={{
+                    flex: 1, padding: "10px", borderRadius: 6, cursor: hzPromoteSelection.size > 0 ? "pointer" : "default",
+                    background: hzPromoteSelection.size > 0 ? C.red : T.border, color: "#FFF", border: "none",
+                    ...lbl, fontSize: 10, opacity: hzPromoteSelection.size > 0 ? 1 : 0.4
+                  }}>PROMOTE {hzPromoteSelection.size > 0 ? `(${hzPromoteSelection.size})` : ""} TO LAUNCH</button>
+                  <button onClick={() => { setHzPromoteModal(null); setHzPromoteSelection(new Set()); }} style={{
+                    padding: "10px 16px", borderRadius: 6, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${T.border}`, color: T.textDim,
+                    ...lbl, fontSize: 10
+                  }}>CANCEL</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {completedHzItems.length > 0 && (
           <div style={{ marginTop: 24 }}>
