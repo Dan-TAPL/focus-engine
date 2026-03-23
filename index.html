@@ -314,15 +314,15 @@ function taskStartTime(block, taskId, allTasks) {
 function getCurrentTask(block, elapsedSecs, allTasks, completedTaskIds, skippedTaskIds) {
   let cumulative = 0;
   for (const id of block.taskIds) {
-    if (completedTaskIds.has(id) || skippedTaskIds.has(id)) continue;
     const t = allTasks.find(tk => tk.id === id);
     const dur = (t ? (parseInt(t.minutes) || 0) * 60 : 0);
-    if (dur === 0) return { task: t, remaining: 0, total: 0 }; // no duration
     cumulative += dur;
+    if (completedTaskIds.has(id) || skippedTaskIds.has(id)) continue;
+    if (dur === 0) return { task: t, remaining: 0, total: 0 };
     const remaining = cumulative - elapsedSecs;
     if (remaining > 0) return { task: t, remaining, total: dur };
   }
-  return null; // all tasks done
+  return null;
 }
 // TAPL Focus Engine — Horizon Logic
 // Data management, radar tier calculations, promote/demote helpers
@@ -797,7 +797,9 @@ function App() {
       </div>
 
       {/* Task rows */}
-      {tasks.map((task, i) => (
+      {tasks.map((task, i) => {
+        const isCompleted = completedTaskIds.has(task.id);
+        return (
         <div key={task.id} style={{
           display: "flex",
           gap: 8,
@@ -805,7 +807,9 @@ function App() {
           alignItems: "center",
           borderLeft: task.promotedColor ? `3px solid ${task.promotedColor}` : "3px solid transparent",
           paddingLeft: 4,
-          borderRadius: 2
+          borderRadius: 2,
+          opacity: isCompleted ? 0.4 : 1,
+          textDecoration: isCompleted ? "line-through" : "none"
         }}>
           <div style={{
             ...lbl,
@@ -861,7 +865,8 @@ function App() {
             }}
           />
         </div>
-      ))}
+        );
+      })}
 
       {/* Task count */}
       <div style={{ marginTop: 12, textAlign: "right", padding: "0 4px" }}>
@@ -936,6 +941,7 @@ function App() {
   const [soundsOn, setSoundsOn] = useState(true);
   const [completedTaskIds, setCompletedTaskIds] = useState(new Set());
   const [skippedTaskIds, setSkippedTaskIds] = useState(new Set());
+  const [taskTimeOffset, setTaskTimeOffset] = useState(0); // accumulated time saved by early complete/skip
   const [completedBlockIds, setCompletedBlockIds] = useState(new Set());
   const [taskPrompt, setTaskPrompt] = useState(null); // task id to show completion prompt for
   const timerRef = useRef(null);
@@ -1060,6 +1066,7 @@ function App() {
             // Break complete, start next block
             sendNotification("Break Over", "Time to focus. Next block starting now.");
             setCurrentBlockIdx(prev => prev + 1);
+            setTaskTimeOffset(0);
             setPhase("countdown");
             setCountdownNum(3);
           }
@@ -1097,6 +1104,7 @@ function App() {
     setCurrentBlockIdx(0);
     setCompletedTaskIds(new Set());
     setSkippedTaskIds(new Set());
+    setTaskTimeOffset(0);
     setCompletedBlockIds(new Set());
     setTaskPrompt(null);
     setPaused(false);
@@ -1111,6 +1119,7 @@ function App() {
     setPaused(false);
     setCurrentBlockIdx(0);
     setTimeLeft(0);
+    setTaskTimeOffset(0);
     setCompletedTaskIds(new Set());
     setSkippedTaskIds(new Set());
     setCompletedBlockIds(new Set());
@@ -1139,6 +1148,7 @@ function App() {
       });
     }
     setTaskPrompt(null);
+    setTaskTimeOffset(0);
     setPaused(false);
     setPhase("countdown");
     setCountdownNum(3);
@@ -1211,12 +1221,20 @@ function App() {
   };
 
   const completeTask = (taskId) => {
+    // Add the remaining time of this task to the offset so the next task starts fresh
+    if (currentTaskInfo && currentTaskInfo.task && currentTaskInfo.task.id === taskId) {
+      setTaskTimeOffset(prev => prev + currentTaskInfo.remaining);
+    }
     setCompletedTaskIds(prev => new Set([...prev, taskId]));
     setTaskPrompt(null);
     if (soundsOn) AudioEngine.playTaskComplete();
   };
 
   const skipTask = (taskId) => {
+    // Add the remaining time of this task to the offset so the next task starts fresh
+    if (currentTaskInfo && currentTaskInfo.task && currentTaskInfo.task.id === taskId) {
+      setTaskTimeOffset(prev => prev + currentTaskInfo.remaining);
+    }
     setSkippedTaskIds(prev => new Set([...prev, taskId]));
     setTaskPrompt(null);
   };
@@ -1501,10 +1519,12 @@ update();
                     {bucket.tasks.map(task => {
                       const qb = getQuadBtn(task.quadrant);
                       const q = getQuad(task.quadrant);
+                      const isCompleted = completedTaskIds.has(task.id);
                       return (
                         <div key={task.id} style={{
                           display: "flex", justifyContent: "space-between", alignItems: "center",
-                          padding: "8px 14px", borderBottom: `1px solid ${T.border}22`
+                          padding: "8px 14px", borderBottom: `1px solid ${T.border}22`,
+                          opacity: isCompleted ? 0.4 : 1, textDecoration: isCompleted ? "line-through" : "none"
                         }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ ...lbl, fontSize: 9, color: T.textFaint }}>{tasks.indexOf(task) + 1}.</span>
@@ -1549,10 +1569,13 @@ update();
                         <div style={{ padding: "10px 14px", color: T.textFaint, fontSize: 11, fontStyle: "italic" }}>
                           No tasks tagged here
                         </div>
-                      ) : group.tasks.map(task => (
+                      ) : group.tasks.map(task => {
+                        const isCompleted = completedTaskIds.has(task.id);
+                        return (
                         <div key={task.id} style={{
                           display: "flex", justifyContent: "space-between", alignItems: "center",
-                          padding: "8px 14px", borderBottom: `1px solid ${T.border}22`
+                          padding: "8px 14px", borderBottom: `1px solid ${T.border}22`,
+                          opacity: isCompleted ? 0.4 : 1, textDecoration: isCompleted ? "line-through" : "none"
                         }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ ...lbl, fontSize: 9, color: T.textFaint }}>{tasks.indexOf(task) + 1}.</span>
@@ -1561,7 +1584,8 @@ update();
                           </div>
                           <span style={{ ...lbl, fontSize: 10, color: group.color }}>{task.minutes}M</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ))}
 
@@ -2029,6 +2053,7 @@ update();
                         const task = tasks.find(t => t.id === tid);
                         if (!task) return null;
                         const q = getQuad(task.quadrant);
+                        const isCompleted = completedTaskIds.has(tid);
                         return (
                           <div key={tid}
                             draggable
@@ -2043,7 +2068,8 @@ update();
                               background: q ? q.bg : T.border + "44",
                               border: `1px solid ${q ? q.color + "44" : T.border}`,
                               borderRadius: 6, padding: "4px 8px",
-                              cursor: "grab", opacity: dragTaskId === tid ? 0.4 : 1
+                              cursor: "grab", opacity: isCompleted ? 0.4 : (dragTaskId === tid ? 0.4 : 1),
+                              textDecoration: isCompleted ? "line-through" : "none"
                           }}>
                             {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color }} />}
                             {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal }}>{task.promotedFrom}</span>}
@@ -2343,7 +2369,7 @@ update();
 
   // --- Step 4: Run Session ---
   const currentTaskInfo = (phase === "work" && currentBlock)
-    ? getCurrentTask(currentBlock, (blockWorkSeconds(currentBlock, tasks) - timeLeft), tasks, completedTaskIds, skippedTaskIds)
+    ? getCurrentTask(currentBlock, (blockWorkSeconds(currentBlock, tasks) - timeLeft + taskTimeOffset), tasks, completedTaskIds, skippedTaskIds)
     : null;
 
   // Update popup state
@@ -2515,10 +2541,17 @@ update();
               {isWork
                 ? (currentTaskInfo
                   ? `${currentTaskInfo.task.text}`
-                  : "No further tasks scheduled")
+                  : "All tasks completed!")
                 : `${currentBlock ? currentBlock.breakMins : 0} min break`
               }
             </div>
+            {isWork && !currentTaskInfo && (
+              <button onClick={skipPhase} style={{
+                marginTop: 10, background: C.green, color: "#FFF", border: "none",
+                borderRadius: 6, padding: "8px 18px", cursor: "pointer",
+                ...lbl, fontSize: 9, letterSpacing: "1px"
+              }}>SKIP TO BREAK ▶</button>
+            )}
             {isWork && currentTaskInfo && currentTaskInfo.total > 0 && (
               <div style={{ ...lbl, fontSize: 9, color: C.green, marginTop: 4 }}>
                 TASK: {formatTime(currentTaskInfo.remaining)}
