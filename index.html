@@ -1265,6 +1265,7 @@ function App() {
       if (soundsOn) AudioEngine.playGoBeep();
       const workSecs = currentBlock ? blockWorkSeconds(currentBlock, tasks) : 0;
       setTimeLeft(workSecs);
+      setTaskTimeOffset(0);
       deadlineRef.current = Date.now() + workSecs * 1000;
       setPhase("work");
       return;
@@ -1403,6 +1404,7 @@ function App() {
       }
     } else if (phase === "break") {
       setCurrentBlockIdx(prev => prev + 1);
+      setTaskTimeOffset(0);
       setPhase("countdown");
       setCountdownNum(3);
     }
@@ -1966,22 +1968,17 @@ update();
     const origIdx = newTasks.findIndex(t => t.id === taskId);
     newTasks[origIdx] = { ...task, minutes: String(chunks[0]), text: `${task.text} (1/${chunks.length})` };
 
-    // Create new tasks for remaining chunks, find empty rows
-    const emptyRows = newTasks.filter(t => !((t.text || "").trim())).map(t => t.id);
+    // Create new tasks for remaining chunks — append them
     const newIds = [];
-
     for (let i = 1; i < chunks.length; i++) {
-      if (emptyRows.length > 0) {
-        const emptyId = emptyRows.shift();
-        const emptyIdx = newTasks.findIndex(t => t.id === emptyId);
-        newTasks[emptyIdx] = {
-          ...newTasks[emptyIdx],
-          text: `${task.text.replace(/ \(\d+\/\d+\)$/, "")} (${i + 1}/${chunks.length})`,
-          minutes: String(chunks[i]),
-          quadrant: task.quadrant
-        };
-        newIds.push(emptyId);
-      }
+      const newId = Date.now() + Math.random() + i;
+      newTasks.push({
+        id: newId,
+        text: `${task.text.replace(/ \(\d+\/\d+\)$/, "")} (${i + 1}/${chunks.length})`,
+        minutes: String(chunks[i]),
+        quadrant: task.quadrant || ""
+      });
+      newIds.push(newId);
     }
 
     setTasks(newTasks);
