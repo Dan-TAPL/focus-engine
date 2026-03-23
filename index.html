@@ -364,9 +364,34 @@ function createHorizonItem(type, name, dueDate) {
     triggerDate: "",
     chunks: [], // for projects: [{id, name, done}]
     completed: false,
+    repeat: "none", // "none", "daily", "weekly", "monthly"
+    lastCompletedAt: null, // timestamp of last completion (for repeat cycle)
     createdAt: new Date().toISOString(),
     lastReviewed: new Date().toISOString()
   };
+}
+
+// Check if a repeating item should be reset (uncompleted)
+function shouldResetRepeat(item) {
+  if (!item.repeat || item.repeat === "none" || !item.completed || !item.lastCompletedAt) return false;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const last = new Date(item.lastCompletedAt);
+  last.setHours(0, 0, 0, 0);
+  const daysSince = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+  if (item.repeat === "daily" && daysSince >= 1) return true;
+  if (item.repeat === "weekly" && daysSince >= 7) return true;
+  if (item.repeat === "monthly" && daysSince >= 30) return true;
+  return false;
+}
+
+// Reset a repeating item — uncomplete it and its chunks
+function resetRepeatItem(item) {
+  const reset = { ...item, completed: false, lastReviewed: new Date().toISOString() };
+  if (reset.chunks && reset.chunks.length > 0) {
+    reset.chunks = reset.chunks.map(c => ({ ...c, done: false }));
+  }
+  return reset;
 }
 
 // Review cadence in days per radar tier
@@ -642,12 +667,19 @@ function App() {
   const [horizonItems, setHorizonItems] = useState(() => {
     const items = loadHorizon();
     if (!Array.isArray(items)) return [];
-    return items.map(i => ({
-      ...i,
-      chunks: Array.isArray(i.chunks) ? i.chunks : [],
-      completed: !!i.completed,
-      lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
-    }));
+    return items.map(i => {
+      const item = {
+        ...i,
+        chunks: Array.isArray(i.chunks) ? i.chunks : [],
+        completed: !!i.completed,
+        repeat: i.repeat || "none",
+        lastCompletedAt: i.lastCompletedAt || null,
+        lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
+      };
+      // Auto-reset repeating items whose cycle has elapsed
+      if (shouldResetRepeat(item)) return resetRepeatItem(item);
+      return item;
+    });
   });
 
   // --- Brain Dump State (Step 1) ---
@@ -1087,7 +1119,7 @@ function App() {
   const addHorizonItem = (item) => setHorizonItems(prev => [...prev, item]);
   const updateHorizonItem = (id, updates) => setHorizonItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
   const deleteHorizonItem = (id) => { if (confirm("Delete this item?")) setHorizonItems(prev => prev.filter(i => i.id !== id)); };
-  const completeHorizonItem = (id) => updateHorizonItem(id, { completed: true });
+  const completeHorizonItem = (id) => updateHorizonItem(id, { completed: true, lastCompletedAt: new Date().toISOString() });
   const uncompleteHorizonItem = (id) => updateHorizonItem(id, { completed: false });
   const markReviewed = (id) => updateHorizonItem(id, { lastReviewed: new Date().toISOString() });
 
@@ -2861,7 +2893,7 @@ update();
   const [hzSendExisting, setHzSendExisting] = useState("");
 
   const startCapture = () => {
-    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", chunks: [] });
+    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", chunks: [] });
     setHzCaptureStep(0);
     setHzScreen("capture");
   };
@@ -2871,6 +2903,7 @@ update();
     const item = createHorizonItem(d.type, d.name, d.dueDate);
     item.dateConfirmed = d.dateConfirmed;
     item.size = d.size;
+    item.repeat = d.repeat || "none";
     if (d.type === "project" && d.chunks && d.chunks.length > 0) {
       item.chunks = d.chunks.filter(c => c.trim()).map((c, i) => ({ id: "chunk_" + Date.now() + "_" + i, name: c, done: false }));
     }
@@ -2897,7 +2930,7 @@ update();
         const existing = horizonItems.find(i => i.id === hzEditId);
         if (!existing) return;
         const updates = {
-          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size,
+          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none",
           lastReviewed: new Date().toISOString()
         };
         if (existing.type === "project") {
@@ -3106,7 +3139,26 @@ update();
             <div style={{ fontSize: 11, color: T.textFaint, marginTop: 12 }}>This updates automatically as the date approaches.</div>
           </div>
         ),
-        // Step 6: Break it down (projects only) or Summary (tasks)
+        // Step 6: Repeat
+        () => (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Does this repeat?</div>
+            <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>Repeating items auto-reset after completion on their cycle.</div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {[{id:"none",label:"No Repeat",desc:"One-off"},{id:"daily",label:"Daily",desc:"Resets every day"},{id:"weekly",label:"Weekly",desc:"Resets every 7 days"},{id:"monthly",label:"Monthly",desc:"Resets every 30 days"}].map(r => (
+                <button key={r.id} onClick={() => { update("repeat", r.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                  padding: "16px 20px", borderRadius: 8, cursor: "pointer", textAlign: "center",
+                  background: T.card, border: `2px solid ${(d.repeat || "none") === r.id ? C.teal : T.border}`,
+                  transition: "all 0.15s", minWidth: 100
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: T.text }}>{r.label}</div>
+                  <div style={{ fontSize: 10, color: T.textDim, marginTop: 2 }}>{r.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ),
+        // Step 7: Break it down (projects only) or Summary (tasks)
         ...(d.type === "project" ? [() => (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Break It Down</div>
@@ -3143,6 +3195,7 @@ update();
                 { label: "NAME", value: d.name },
                 { label: "DUE", value: d.dueDate ? `${new Date(d.dueDate).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})} ${d.dateConfirmed ? "◆ Confirmed" : "◇ Suggested"}` : "No date" },
                 { label: "SIZE", value: d.size === "S" ? "Small — Under an hour" : d.size === "M" ? "Medium — A few hours" : "Large — Multiple sessions" },
+                { label: "REPEAT", value: d.repeat === "daily" ? "Daily" : d.repeat === "weekly" ? "Weekly" : d.repeat === "monthly" ? "Monthly" : "No repeat" },
                 { label: "RADAR", value: tierInfo ? `● ${tierInfo.label} (${TIER_DISPLAY[tier].range})` : "SOMEDAY" }
               ].map(row => (
                 <div key={row.label} style={{
@@ -3252,10 +3305,25 @@ update();
                   background: T.card, border: `1px solid ${escColor}33`
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                    <span style={{
-                      padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
-                      background: item.type === "project" ? C.purple : C.teal, color: "#FFF"
-                    }}>{item.type === "project" ? "P" : "T"}</span>
+                    <span style={{ position: "relative", flexShrink: 0 }}>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
+                        background: item.type === "project" ? C.purple : C.teal, color: "#FFF",
+                        display: "inline-block"
+                      }}>{item.type === "project" ? "P" : "T"}</span>
+                      {(() => {
+                        const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
+                        return outstanding > 0 ? (
+                          <span style={{
+                            position: "absolute", top: -5, right: -7,
+                            width: 14, height: 14, borderRadius: "50%",
+                            background: C.red, color: "#FFF",
+                            fontSize: 8, fontWeight: 900,
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                          }}>{outstanding}</span>
+                        ) : null;
+                      })()}
+                    </span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {item.name}
                     </span>
@@ -3274,6 +3342,7 @@ update();
                       setHzCaptureData({
                         type: item.type, name: item.name, dueDate: item.dueDate || "",
                         dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
+                        repeat: item.repeat || "none",
                         chunks: item.chunks ? item.chunks.map(c => c.name) : []
                       });
                       setHzCaptureStep(1);
@@ -3365,19 +3434,36 @@ update();
                         )}
                       </div>
                     )}
-                    {/* Row 1: Type badge + Name + Days */}
+                    {/* Row 1: Type badge + repeat + Days */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                        <span style={{
-                          padding: "4px 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
-                          background: item.type === "project" ? C.purple : C.teal,
-                          color: "#FFFFFF", flexShrink: 0
-                        }}>{item.type.toUpperCase()}</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.name}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ position: "relative", flexShrink: 0 }}>
+                          <span style={{
+                            padding: "4px 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
+                            background: item.type === "project" ? C.purple : C.teal,
+                            color: "#FFFFFF", display: "inline-block"
+                          }}>{item.type.toUpperCase()}</span>
+                          {(() => {
+                            const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
+                            return outstanding > 0 ? (
+                              <span style={{
+                                position: "absolute", top: -6, right: -8,
+                                width: 18, height: 18, borderRadius: "50%",
+                                background: C.red, color: "#FFF",
+                                fontSize: 9, fontWeight: 900,
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                              }}>{outstanding}</span>
+                            ) : null;
+                          })()}
                         </span>
+                        {item.repeat && item.repeat !== "none" && (
+                          <span style={{
+                            padding: "4px 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
+                            background: C.amber, color: "#FFFFFF", display: "inline-block"
+                          }}>🔄 {item.repeat.toUpperCase()}</span>
+                        )}
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
                         {item.dueDate ? (
                           <>
                             <div style={{ fontSize: 24, fontWeight: 900, color: tier.color }}>{days}</div>
@@ -3385,6 +3471,12 @@ update();
                           </>
                         ) : <div style={{ ...lbl, fontSize: 8, color: T.textFaint }}>no date</div>}
                       </div>
+                    </div>
+                    {/* Row 2: Name */}
+                    <div style={{ marginTop: 8 }}>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: T.text }}>
+                        {item.name}
+                      </span>
                     </div>
                     {/* Row 2: Meta info */}
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
@@ -3473,6 +3565,7 @@ update();
                         setHzCaptureData({
                           type: item.type, name: item.name, dueDate: item.dueDate || "",
                           dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
+                          repeat: item.repeat || "none",
                           chunks: item.chunks ? item.chunks.map(c => c.name) : []
                         });
                         setHzCaptureStep(1);
