@@ -315,7 +315,8 @@ function getCurrentTask(block, elapsedSecs, allTasks, completedTaskIds, skippedT
   let cumulative = 0;
   for (const id of block.taskIds) {
     const t = allTasks.find(tk => tk.id === id);
-    const dur = (t ? (parseInt(t.minutes) || 0) * 60 : 0);
+    if (!t) continue; // task was deleted or no longer exists
+    const dur = (parseInt(t.minutes) || 0) * 60;
     cumulative += dur;
     if (completedTaskIds.has(id) || skippedTaskIds.has(id)) continue;
     if (dur === 0) return { task: t, remaining: 0, total: 0 };
@@ -1074,6 +1075,21 @@ function App() {
   useEffect(() => { saveData("tapl-session-end", sessionEnd); }, [sessionEnd]);
   useEffect(() => { saveData("tapl-completed-tasks", [...completedTaskIds]); }, [completedTaskIds]);
   useEffect(() => { saveData("tapl-skipped-tasks", [...skippedTaskIds]); }, [skippedTaskIds]);
+
+  // Clean stale task IDs from blocks when tasks change
+  useEffect(() => {
+    const taskIdSet = new Set(tasks.map(t => t.id));
+    let needsClean = false;
+    blocks.forEach(b => {
+      if (b.taskIds && b.taskIds.some(id => !taskIdSet.has(id))) needsClean = true;
+    });
+    if (needsClean) {
+      setBlocks(prev => prev.map(b => ({
+        ...b,
+        taskIds: (b.taskIds || []).filter(id => taskIdSet.has(id))
+      })));
+    }
+  }, [tasks]);
 
   // --- Run Session State (Step 4) ---
   const [sessionActive, setSessionActive] = useState(false);
