@@ -3437,11 +3437,11 @@ update();
                     {/* Row 1: Type badge + repeat + Days */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ position: "relative", flexShrink: 0 }}>
+                        <span style={{ position: "relative" }}>
                           <span style={{
-                            padding: "4px 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
+                            padding: "0 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
                             background: item.type === "project" ? C.purple : C.teal,
-                            color: "#FFFFFF", display: "inline-block"
+                            color: "#FFFFFF", height: 24, display: "inline-flex", alignItems: "center"
                           }}>{item.type.toUpperCase()}</span>
                           {(() => {
                             const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
@@ -3458,9 +3458,9 @@ update();
                         </span>
                         {item.repeat && item.repeat !== "none" && (
                           <span style={{
-                            padding: "4px 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
-                            background: C.amber, color: "#FFFFFF", display: "inline-block"
-                          }}>🔄 {item.repeat.toUpperCase()}</span>
+                            padding: "0 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
+                            background: C.amber, color: "#FFFFFF", height: 24, display: "inline-flex", alignItems: "center"
+                          }}>{item.repeat.toUpperCase()}</span>
                         )}
                       </div>
                       <div style={{ textAlign: "right", flexShrink: 0 }}>
