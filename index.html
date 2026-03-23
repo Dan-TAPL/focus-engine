@@ -651,11 +651,10 @@ function App() {
   });
 
   // --- Brain Dump State (Step 1) ---
-  const ROWS = 30;
   const [tasks, setTasks] = useState(() => {
     const saved = loadData("tapl-tasks", null);
-    if (saved && Array.isArray(saved)) return saved;
-    return Array.from({ length: ROWS }, (_, i) => ({ id: i, text: "", minutes: "" }));
+    if (saved && Array.isArray(saved) && saved.length > 0) return saved;
+    return [{ id: Date.now(), text: "", minutes: "" }];
   });
 
   // Save tasks on change
@@ -667,6 +666,30 @@ function App() {
   // Update task field
   const updateTask = (index, field, value) => {
     setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
+  };
+
+  // Add a new empty task row
+  const addTask = () => {
+    setTasks(prev => [...prev, { id: Date.now() + Math.random(), text: "", minutes: "" }]);
+  };
+
+  // Delete a task by index
+  const deleteTask = (index) => {
+    setTasks(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) return [{ id: Date.now(), text: "", minutes: "" }];
+      return next;
+    });
+  };
+
+  // Toggle manual complete on a task
+  const toggleTaskComplete = (taskId) => {
+    setCompletedTaskIds(prev => {
+      const next = new Set([...prev]);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
   };
 
   // --- Step labels ---
@@ -859,9 +882,12 @@ function App() {
       <div style={{ marginBottom: 16 }} />
 
       {/* Column headers */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 6, padding: "0 4px" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 6, padding: "0 4px", alignItems: "center" }}>
+        <div style={{ width: 24 }} />
+        <div style={{ width: 22, ...lbl, fontSize: 9, color: T.textDim, textAlign: "center" }}>✓</div>
         <div style={{ ...lbl, fontSize: 9, color: T.textDim, flex: 1 }}>TASK</div>
         <div style={{ ...lbl, fontSize: 9, color: T.textDim, width: 70, textAlign: "center" }}>MINS</div>
+        <div style={{ width: 24 }} />
       </div>
 
       {/* Task rows */}
@@ -875,9 +901,7 @@ function App() {
           alignItems: "center",
           borderLeft: task.promotedColor ? `3px solid ${task.promotedColor}` : "3px solid transparent",
           paddingLeft: 4,
-          borderRadius: 2,
-          opacity: isCompleted ? 0.4 : 1,
-          textDecoration: isCompleted ? "line-through" : "none"
+          borderRadius: 2
         }}>
           <div style={{
             ...lbl,
@@ -889,6 +913,7 @@ function App() {
           }}>
             {i + 1}
           </div>
+          <input type="checkbox" checked={isCompleted} onChange={() => toggleTaskComplete(task.id)} style={{ cursor: "pointer", flexShrink: 0 }} />
           {task.promotedFrom && (
             <span style={{
               padding: "2px 6px", borderRadius: 3, flexShrink: 0,
@@ -912,7 +937,9 @@ function App() {
               fontSize: 13,
               fontFamily: "'Montserrat', sans-serif",
               outline: "none",
-              transition: "border 0.15s"
+              transition: "border 0.15s",
+              opacity: isCompleted ? 0.4 : 1,
+              textDecoration: isCompleted ? "line-through" : "none"
             }}
           />
           <input
@@ -929,12 +956,27 @@ function App() {
               fontSize: 13,
               fontFamily: "'Montserrat', sans-serif",
               textAlign: "center",
-              outline: "none"
+              outline: "none",
+              opacity: isCompleted ? 0.4 : 1
             }}
           />
+          <button onClick={() => deleteTask(i)} style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: T.textFaint, fontSize: 14, padding: "4px", flexShrink: 0,
+            opacity: 0.5, transition: "opacity 0.15s"
+          }}>✕</button>
         </div>
         );
       })}
+
+      {/* Add task button */}
+      <button onClick={addTask} style={{
+        width: "100%", marginTop: 8, padding: "10px",
+        background: "transparent", border: `1px dashed ${T.border}`,
+        borderRadius: 6, cursor: "pointer",
+        ...lbl, fontSize: 10, color: T.textDim, letterSpacing: "1px",
+        transition: "all 0.15s"
+      }}>+ ADD TASK</button>
 
       {/* Task count */}
       <div style={{ marginTop: 12, textAlign: "right", padding: "0 4px" }}>
@@ -998,6 +1040,8 @@ function App() {
   useEffect(() => { saveData("tapl-blocks", blocks); }, [blocks]);
   useEffect(() => { saveData("tapl-session-start", sessionStart); }, [sessionStart]);
   useEffect(() => { saveData("tapl-session-end", sessionEnd); }, [sessionEnd]);
+  useEffect(() => { saveData("tapl-completed-tasks", [...completedTaskIds]); }, [completedTaskIds]);
+  useEffect(() => { saveData("tapl-skipped-tasks", [...skippedTaskIds]); }, [skippedTaskIds]);
 
   // --- Run Session State (Step 4) ---
   const [sessionActive, setSessionActive] = useState(false);
@@ -1007,8 +1051,14 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0); // seconds remaining in current phase
   const [paused, setPaused] = useState(false);
   const [soundsOn, setSoundsOn] = useState(true);
-  const [completedTaskIds, setCompletedTaskIds] = useState(new Set());
-  const [skippedTaskIds, setSkippedTaskIds] = useState(new Set());
+  const [completedTaskIds, setCompletedTaskIds] = useState(() => {
+    const saved = loadData("tapl-completed-tasks", []);
+    return new Set(Array.isArray(saved) ? saved : []);
+  });
+  const [skippedTaskIds, setSkippedTaskIds] = useState(() => {
+    const saved = loadData("tapl-skipped-tasks", []);
+    return new Set(Array.isArray(saved) ? saved : []);
+  });
   const [taskTimeOffset, setTaskTimeOffset] = useState(0); // accumulated time saved by early complete/skip
   const [completedBlockIds, setCompletedBlockIds] = useState(new Set());
   const [taskPrompt, setTaskPrompt] = useState(null); // task id to show completion prompt for
@@ -1072,22 +1122,19 @@ function App() {
     }
 
     setTasks(prev => {
-      const next = [...prev];
-      for (const nt of newTasks) {
-        const realEmpty = next.findIndex(t => !((t.text || "").trim()));
-        if (realEmpty !== -1) {
-          next[realEmpty] = {
-            ...next[realEmpty],
-            text: nt.text,
-            minutes: nt.minutes || "",
-            promotedFrom: sourceName,
-            promotedColor: sourceColor,
-            horizonItemId: itemId,
-            horizonChunkId: nt.chunkId
-          };
-        }
-      }
-      return next;
+      // Filter out empty rows, then append promoted tasks
+      const existing = prev.filter(t => (t.text || "").trim());
+      const promoted = newTasks.map(nt => ({
+        id: Date.now() + Math.random(),
+        text: nt.text,
+        minutes: nt.minutes || "",
+        promotedFrom: sourceName,
+        promotedColor: sourceColor,
+        horizonItemId: itemId,
+        horizonChunkId: nt.chunkId
+      }));
+      const result = [...existing, ...promoted];
+      return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
     });
     if (item.type === "task") {
       updateHorizonItem(itemId, { promoted: true });
@@ -1268,9 +1315,11 @@ function App() {
   };
 
   const resetBrainDump = () => {
-    if (confirm("Clear all tasks? This will also clear categories and block assignments.")) {
-      setTasks(Array.from({ length: 30 }, (_, i) => ({ id: i, text: "", minutes: "" })));
+    if (confirm("Clear all tasks? This will also clear categories, block assignments, and completion status.")) {
+      setTasks([{ id: Date.now(), text: "", minutes: "" }]);
       setBlocks(defaultBlocks());
+      setCompletedTaskIds(new Set());
+      setSkippedTaskIds(new Set());
       resetSession();
     }
   };
@@ -1287,17 +1336,17 @@ function App() {
         const parsed = parseCSV(ev.target.result);
         if (parsed.length === 0) { alert("No tasks found in CSV."); return; }
         setTasks(prev => {
-          const next = [...prev];
-          let slot = 0;
-          parsed.forEach(pt => {
-            // Find next empty slot
-            while (slot < next.length && ((next[slot].text || "").trim())) slot++;
-            if (slot < next.length) {
-              next[slot] = { ...next[slot], text: pt.text, minutes: pt.minutes, quadrant: pt.quadrant || "", promotedFrom: pt.promotedFrom || "" };
-              slot++;
-            }
-          });
-          return next;
+          // Filter out empty rows, then append imported tasks
+          const existing = prev.filter(t => (t.text || "").trim());
+          const newTasks = parsed.map(pt => ({
+            id: Date.now() + Math.random(),
+            text: pt.text,
+            minutes: pt.minutes,
+            quadrant: pt.quadrant || "",
+            promotedFrom: pt.promotedFrom || ""
+          }));
+          const result = [...existing, ...newTasks];
+          return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
         });
       };
       reader.readAsText(file);
@@ -2189,6 +2238,7 @@ update();
                               textDecoration: isCompleted ? "line-through" : "none"
                           }}>
                             {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color }} />}
+                            <input type="checkbox" checked={isCompleted} onChange={(e) => { e.stopPropagation(); toggleTaskComplete(tid); }} style={{ cursor: "pointer", flexShrink: 0 }} />
                             {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal }}>{task.promotedFrom}</span>}
                             <span style={{ fontSize: 11, color: T.text }}>{task.text}</span>
                             <span style={{ ...lbl, fontSize: 9, color: q ? q.color : T.textDim }}>{task.minutes}M</span>
