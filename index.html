@@ -366,6 +366,7 @@ function createHorizonItem(type, name, dueDate) {
     chunks: [], // for projects: [{id, name, done}]
     completed: false,
     repeat: "none", // "none", "daily", "weekly", "monthly"
+    pulseFreq: "medium", // "high", "medium", "low"
     lastCompletedAt: null, // timestamp of last completion (for repeat cycle)
     createdAt: new Date().toISOString(),
     lastReviewed: new Date().toISOString()
@@ -403,6 +404,21 @@ const REVIEW_CADENCE = {
   someday: 14  // SOMEDAY: fortnightly
 };
 
+// Pulse frequency multipliers
+const PULSE_FREQ = {
+  high: 0.5,   // halve the cadence (check more often)
+  medium: 1,   // default — use radar tier cadence as-is
+  low: 2       // double the cadence (check less often)
+};
+
+// Get effective cadence for an item (radar tier × pulse frequency)
+function getEffectiveCadence(item) {
+  const tier = getRadarTier(item.dueDate);
+  const baseCadence = REVIEW_CADENCE[tier];
+  const freq = PULSE_FREQ[item.pulseFreq || "medium"] || 1;
+  return Math.max(1, Math.round(baseCadence * freq)); // minimum 1 day
+}
+
 // Calculate days since last review
 function daysSinceReview(item) {
   if (!item.lastReviewed) return Infinity;
@@ -415,19 +431,17 @@ function daysSinceReview(item) {
 
 // Check if an item is overdue for review
 function isOverdueForReview(item) {
-  const tier = getRadarTier(item.dueDate);
-  const cadence = REVIEW_CADENCE[tier];
+  const cadence = getEffectiveCadence(item);
   return daysSinceReview(item) >= cadence;
 }
 
 // Get escalation level: 0 = fine, 1 = needs review (amber), 2 = significantly overdue (red)
 function getEscalationLevel(item) {
-  const tier = getRadarTier(item.dueDate);
-  const cadence = REVIEW_CADENCE[tier];
+  const cadence = getEffectiveCadence(item);
   const daysSince = daysSinceReview(item);
   if (daysSince < cadence) return 0;
-  if (daysSince < cadence * 2) return 1; // amber — overdue by one cycle
-  return 2; // red — overdue by two+ cycles
+  if (daysSince < cadence * 2) return 1;
+  return 2;
 }
 
 // Check if item is past due date
@@ -674,6 +688,7 @@ function App() {
         chunks: Array.isArray(i.chunks) ? i.chunks : [],
         completed: !!i.completed,
         repeat: i.repeat || "none",
+        pulseFreq: i.pulseFreq || "medium",
         lastCompletedAt: i.lastCompletedAt || null,
         lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
       };
@@ -2906,7 +2921,7 @@ update();
   const [hzSendExisting, setHzSendExisting] = useState("");
 
   const startCapture = () => {
-    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", chunks: [] });
+    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", chunks: [] });
     setHzCaptureStep(0);
     setHzScreen("capture");
   };
@@ -2917,6 +2932,7 @@ update();
     item.dateConfirmed = d.dateConfirmed;
     item.size = d.size;
     item.repeat = d.repeat || "none";
+    item.pulseFreq = d.pulseFreq || "medium";
     if (d.type === "project" && d.chunks && d.chunks.length > 0) {
       item.chunks = d.chunks.filter(c => c.trim()).map((c, i) => ({ id: "chunk_" + Date.now() + "_" + i, name: c, done: false }));
     }
@@ -2943,7 +2959,7 @@ update();
         const existing = horizonItems.find(i => i.id === hzEditId);
         if (!existing) return;
         const updates = {
-          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none",
+          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none", pulseFreq: d.pulseFreq || "medium",
           lastReviewed: new Date().toISOString()
         };
         if (existing.type === "project") {
@@ -3171,7 +3187,31 @@ update();
             </div>
           </div>
         ),
-        // Step 7: Break it down (projects only) or Summary (tasks)
+        // Step 7: Pulse Check Frequency
+        () => (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Pulse Check Frequency</div>
+            <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>How often should this surface for review? This adjusts alongside the radar tier.</div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {[
+                {id:"high",label:"HIGH",desc:"Check frequently",detail:"Halves the standard cadence"},
+                {id:"medium",label:"MEDIUM",desc:"Standard cadence",detail:"Based on radar tier"},
+                {id:"low",label:"LOW",desc:"Check less often",detail:"Doubles the standard cadence"}
+              ].map(p => (
+                <button key={p.id} onClick={() => { update("pulseFreq", p.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                  padding: "16px 20px", borderRadius: 8, cursor: "pointer", textAlign: "center",
+                  background: T.card, border: `2px solid ${(d.pulseFreq || "medium") === p.id ? C.teal : T.border}`,
+                  transition: "all 0.15s", minWidth: 100
+                }}>
+                  <div style={{ ...lbl, fontSize: 14, color: p.id === "high" ? C.red : p.id === "low" ? C.green : C.teal }}>{p.label}</div>
+                  <div style={{ fontSize: 11, color: T.text, marginTop: 4 }}>{p.desc}</div>
+                  <div style={{ fontSize: 9, color: T.textDim, marginTop: 2 }}>{p.detail}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ),
+        // Step 8: Break it down (projects only) or Summary (tasks)
         ...(d.type === "project" ? [() => (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Break It Down</div>
@@ -3209,6 +3249,7 @@ update();
                 { label: "DUE", value: d.dueDate ? `${new Date(d.dueDate).toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric"})} ${d.dateConfirmed ? "◆ Confirmed" : "◇ Suggested"}` : "No date" },
                 { label: "SIZE", value: d.size === "S" ? "Small — Under an hour" : d.size === "M" ? "Medium — A few hours" : "Large — Multiple sessions" },
                 { label: "REPEAT", value: d.repeat === "daily" ? "Daily" : d.repeat === "weekly" ? "Weekly" : d.repeat === "monthly" ? "Monthly" : "No repeat" },
+                { label: "PULSE CHECK", value: (d.pulseFreq || "medium") === "high" ? "High — check frequently" : (d.pulseFreq || "medium") === "low" ? "Low — check less often" : "Medium — standard cadence" },
                 { label: "RADAR", value: tierInfo ? `● ${tierInfo.label} (${TIER_DISPLAY[tier].range})` : "SOMEDAY" }
               ].map(row => (
                 <div key={row.label} style={{
@@ -3355,7 +3396,7 @@ update();
                       setHzCaptureData({
                         type: item.type, name: item.name, dueDate: item.dueDate || "",
                         dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                        repeat: item.repeat || "none",
+                        repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
                         chunks: item.chunks ? item.chunks.map(c => c.name) : []
                       });
                       setHzCaptureStep(1);
@@ -3510,6 +3551,14 @@ update();
                           background: T.border + "44", color: T.textDim
                         }}>SIZE: {item.size}</span>
                       )}
+                      {item.pulseFreq && item.pulseFreq !== "medium" && (
+                        <span style={{
+                          padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                          background: (item.pulseFreq === "high" ? C.red : C.green) + "15",
+                          color: item.pulseFreq === "high" ? C.red : C.green,
+                          border: `1px solid ${(item.pulseFreq === "high" ? C.red : C.green)}33`
+                        }}>PULSE: {item.pulseFreq.toUpperCase()}</span>
+                      )}
                       {chunksTotal > 0 && (
                         <span style={{ fontSize: 10, color: T.textDim }}>{chunksDone}/{chunksTotal} steps</span>
                       )}
@@ -3578,7 +3627,7 @@ update();
                         setHzCaptureData({
                           type: item.type, name: item.name, dueDate: item.dueDate || "",
                           dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                          repeat: item.repeat || "none",
+                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
                           chunks: item.chunks ? item.chunks.map(c => c.name) : []
                         });
                         setHzCaptureStep(1);
