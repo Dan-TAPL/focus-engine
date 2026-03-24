@@ -3021,6 +3021,34 @@ update();
                 ))}
               </div>
             </div>
+            {/* Repeat */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>REPEAT</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{id:"none",label:"NONE"},{id:"daily",label:"DAILY"},{id:"weekly",label:"WEEKLY"},{id:"monthly",label:"MONTHLY"}].map(r => (
+                  <button key={r.id} onClick={() => update("repeat", r.id)} style={{
+                    flex: 1, padding: "8px", borderRadius: 6, cursor: "pointer",
+                    background: (d.repeat || "none") === r.id ? C.amber + "22" : "transparent",
+                    border: `1px solid ${(d.repeat || "none") === r.id ? C.amber : T.border}`,
+                    ...lbl, fontSize: 9, color: (d.repeat || "none") === r.id ? C.amber : T.textDim
+                  }}>{r.label}</button>
+                ))}
+              </div>
+            </div>
+            {/* Pulse Check Frequency */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>PULSE CHECK FREQUENCY</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{id:"high",label:"HIGH",color:C.red},{id:"medium",label:"MEDIUM",color:C.teal},{id:"low",label:"LOW",color:C.green}].map(p => (
+                  <button key={p.id} onClick={() => update("pulseFreq", p.id)} style={{
+                    flex: 1, padding: "8px", borderRadius: 6, cursor: "pointer",
+                    background: (d.pulseFreq || "medium") === p.id ? p.color + "22" : "transparent",
+                    border: `1px solid ${(d.pulseFreq || "medium") === p.id ? p.color : T.border}`,
+                    ...lbl, fontSize: 9, color: (d.pulseFreq || "medium") === p.id ? p.color : T.textDim
+                  }}>{p.label}</button>
+                ))}
+              </div>
+            </div>
             {/* Chunks (projects only) */}
             {d.type === "project" && (
               <div style={{ marginBottom: 16 }}>
