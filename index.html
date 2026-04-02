@@ -5073,7 +5073,7 @@ async function sendOTP() {
   if (!email || !email.includes('@')) { showMsg('email-message','Please enter a valid email address.','error'); return; }
   const btn = document.getElementById('send-otp-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Sending...';
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: null } });
   btn.disabled = false; btn.innerHTML = 'Send Access Code →';
   if (error) { showScreen('screen-blocked'); return; }
   currentEmail = email;
