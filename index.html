@@ -5146,8 +5146,6 @@ function backToEmail() {
 function otpInput(el, idx) {
   el.value = el.value.replace(/[^0-9]/g,'');
   if (el.value && idx < 5) document.getElementById('d'+(idx+1)).focus();
-  const code = [0,1,2,3,4,5].map(i => document.getElementById('d'+i).value).join('');
-  if (code.length === 6) verifyOTP();
 }
 
 function otpKeydown(e, idx) {
