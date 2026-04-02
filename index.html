@@ -5102,9 +5102,13 @@ async function verifyOTP() {
 
 async function checkAccess(email) {
   try {
-    const { data, error } = await sb.from('allowed_users').select('email').eq('email', email.toLowerCase()).single();
-    return !error && data !== null;
-  } catch(e) { return false; }
+    const { data, error } = await sb
+      .from('allowed_users')
+      .select('email')
+      .eq('email', email.toLowerCase());
+    if (error) { console.log('Access check error:', error); return false; }
+    return data && data.length > 0;
+  } catch(e) { console.log('Access check exception:', e); return false; }
 }
 
 function showApp() {
