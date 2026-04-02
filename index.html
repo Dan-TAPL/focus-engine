@@ -17,7 +17,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus Engine — TAPL</title>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
@@ -5050,65 +5050,120 @@ ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App 
 </script>
 
 <script>
-const SUPABASE_URL = 'https://trrmgatdmvajyhizrevh.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_2tc67T_s4XqoZvc3cYGJ5A_nCfobdOq';
+// ── AUTH0 CONFIG ────────────────────────────────────────────
+const AUTH0_DOMAIN = 'dev-e3lizbd6wrf6z3ah.us.auth0.com';
+const AUTH0_CLIENT_ID = 'Ij2mZP5IXGBFSC8THKHnKLbWWWExDonI';
+const AUTH0_REDIRECT_URI = 'https://dan-tapl.github.io/focus-engine';
+// ───────────────────────────────────────────────────────────
 
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let auth0Client = null;
 let currentEmail = '';
 
+// Initialise Auth0 on load
 window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session && session.user) {
-      const allowed = await checkAccess(session.user.email);
-      if (allowed) { showApp(); return; }
-      showScreen('screen-blocked');
+  auth0Client = await auth0.createAuth0Client({
+    domain: AUTH0_DOMAIN,
+    clientId: AUTH0_CLIENT_ID,
+    authorizationParams: {
+      redirect_uri: AUTH0_REDIRECT_URI
     }
-  } catch(e) {}
+  });
+
+  // Handle redirect callback after OTP verification
+  if (window.location.search.includes('code=') || window.location.hash.includes('access_token')) {
+    try {
+      await auth0Client.handleRedirectCallback();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch(e) {
+      console.log('Callback error:', e);
+    }
+  }
+
+  // Check if already authenticated
+  const isAuthenticated = await auth0Client.isAuthenticated();
+  if (isAuthenticated) {
+    showApp();
+  }
 });
 
 async function sendOTP() {
   const email = document.getElementById('email-input').value.trim().toLowerCase();
-  if (!email || !email.includes('@')) { showMsg('email-message','Please enter a valid email address.','error'); return; }
+  if (!email || !email.includes('@')) {
+    showMsg('email-message', 'Please enter a valid email address.', 'error'); return;
+  }
+
   const btn = document.getElementById('send-otp-btn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Sending...';
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: null } });
-  btn.disabled = false; btn.innerHTML = 'Send Access Code →';
-  if (error) { showScreen('screen-blocked'); return; }
-  currentEmail = email;
-  document.getElementById('otp-email-display').textContent = email;
-  showScreen('screen-otp');
-  showMsg('otp-message','Code sent — check your inbox and spam folder.','info');
-  setTimeout(() => document.getElementById('d0').focus(), 100);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Sending...';
+
+  try {
+    // Use Auth0 passwordless email OTP
+    await fetch('https://' + AUTH0_DOMAIN + '/passwordless/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: AUTH0_CLIENT_ID,
+        connection: 'email',
+        email: email,
+        send: 'code'
+      })
+    });
+
+    currentEmail = email;
+    document.getElementById('otp-email-display').textContent = email;
+    showScreen('screen-otp');
+    showMsg('otp-message', 'Code sent — check your inbox and spam folder.', 'info');
+    setTimeout(() => document.getElementById('d0').focus(), 100);
+  } catch(e) {
+    showMsg('email-message', 'Something went wrong. Please try again.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Send Access Code →';
 }
 
 async function verifyOTP() {
   const code = [0,1,2,3,4,5].map(i => document.getElementById('d'+i).value).join('');
-  if (code.length !== 6) { showMsg('otp-message','Please enter all 6 digits.','error'); return; }
-  const btn = document.getElementById('verify-otp-btn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Verifying...';
-  const { data, error } = await sb.auth.verifyOtp({ email: currentEmail, token: code, type: 'email' });
-  btn.disabled = false; btn.innerHTML = 'Verify & Enter →';
-  if (error) {
-    showMsg('otp-message','Invalid or expired code. Please try again.','error');
-    [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value = ''; });
-    document.getElementById('d0').focus(); return;
-  }
-  const allowed = await checkAccess(data.user.email);
-  if (!allowed) { await sb.auth.signOut(); showScreen('screen-blocked'); return; }
-  showApp();
-}
+  if (code.length !== 6) { showMsg('otp-message', 'Please enter all 6 digits.', 'error'); return; }
 
-async function checkAccess(email) {
+  const btn = document.getElementById('verify-otp-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Verifying...';
+
   try {
-    const { data, error } = await sb
-      .from('allowed_users')
-      .select('email')
-      .eq('email', email.toLowerCase());
-    if (error) { console.log('Access check error:', error); return false; }
-    return data && data.length > 0;
-  } catch(e) { console.log('Access check exception:', e); return false; }
+    // Exchange OTP code for token via Auth0
+    const response = await fetch('https://' + AUTH0_DOMAIN + '/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'http://auth0.com/oauth/grant-type/passwordless/otp',
+        client_id: AUTH0_CLIENT_ID,
+        username: currentEmail,
+        otp: code,
+        realm: 'email',
+        scope: 'openid profile email'
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      showMsg('otp-message', 'Invalid or expired code. Please try again.', 'error');
+      [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value = ''; });
+      document.getElementById('d0').focus();
+      btn.disabled = false;
+      btn.innerHTML = 'Verify & Enter →';
+      return;
+    }
+
+    // Success — show app
+    showApp();
+
+  } catch(e) {
+    showMsg('otp-message', 'Something went wrong. Please try again.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'Verify & Enter →';
+  }
 }
 
 function showApp() {
