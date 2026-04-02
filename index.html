@@ -367,7 +367,9 @@ function createHorizonItem(type, name, dueDate) {
     completed: false,
     repeat: "none", // "none", "daily", "weekly", "monthly"
     pulseFreq: "medium", // "high", "medium", "low"
-    lastCompletedAt: null, // timestamp of last completion (for repeat cycle)
+    autoRefresh: true, // if true, auto-reset on repeat cycle; if false, prompt user
+    lastCompletedAt: null,
+    needsRefreshPrompt: false, // true when repeat cycle elapsed but autoRefresh is off
     createdAt: new Date().toISOString(),
     lastReviewed: new Date().toISOString()
   };
@@ -375,7 +377,7 @@ function createHorizonItem(type, name, dueDate) {
 
 // Check if a repeating item should be reset (uncompleted)
 function shouldResetRepeat(item) {
-  if (!item.repeat || item.repeat === "none" || !item.completed || !item.lastCompletedAt) return false;
+  if (!item.repeat || item.repeat === "none" || !item.lastCompletedAt) return false;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const last = new Date(item.lastCompletedAt);
@@ -600,14 +602,12 @@ function exportAllCSV(tasks, horizonItems) {
   URL.revokeObjectURL(url);
 }
 
-// CSV Import — reads a CSV and returns task objects
+// CSV Import — reads a CSV and returns parsed rows with all fields
 function parseCSV(csvText) {
   const lines = csvText.split("\n").filter(l => l.trim());
   if (lines.length < 2) return [];
-  // Skip header row
   const dataLines = lines.slice(1);
   return dataLines.map(line => {
-    // Handle quoted fields
     const fields = [];
     let current = "";
     let inQuotes = false;
@@ -619,10 +619,15 @@ function parseCSV(csvText) {
     }
     fields.push(current.trim());
     return {
+      source: fields[0] || "Launch",
       text: fields[1] || "",
       minutes: fields[2] || "",
       quadrant: fields[3] || "",
-      promotedFrom: fields[4] || "",
+      promotedFrom: fields[12] || fields[4] || "",
+      type: fields[4] || "task",
+      dueDate: fields[5] || "",
+      dateStatus: fields[7] || "",
+      size: fields[8] || "S",
     };
   }).filter(t => t.text);
 }
@@ -689,14 +694,98 @@ function App() {
         completed: !!i.completed,
         repeat: i.repeat || "none",
         pulseFreq: i.pulseFreq || "medium",
+        autoRefresh: i.autoRefresh !== false, // default true for existing items
+        needsRefreshPrompt: !!i.needsRefreshPrompt,
         lastCompletedAt: i.lastCompletedAt || null,
         lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
       };
-      // Auto-reset repeating items whose cycle has elapsed
-      if (shouldResetRepeat(item)) return resetRepeatItem(item);
+      // Handle repeating items whose cycle has elapsed
+      if (shouldResetRepeat(item)) {
+        if (item.autoRefresh !== false) {
+          return resetRepeatItem(item);
+        } else {
+          // Flag for user prompt instead of auto-resetting
+          return { ...item, needsRefreshPrompt: true };
+        }
+      }
       return item;
     });
   });
+
+  // --- Horizon Folders ---
+  const [hzFolders, setHzFolders] = useState(() => {
+    const saved = loadData("tapl-hz-folders", []);
+    return Array.isArray(saved) ? saved : [];
+  });
+  useEffect(() => { saveData("tapl-hz-folders", hzFolders); }, [hzFolders]);
+
+  const addFolder = (name) => {
+    const id = "folder_" + Date.now();
+    setHzFolders(prev => [...prev, { id, name, collapsed: false, sortOrder: prev.length }]);
+    return id;
+  };
+  const renameFolder = (id, name) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
+  const toggleFolderCollapse = (id) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, collapsed: !f.collapsed } : f));
+  const deleteFolder = (id) => {
+    setHzFolders(prev => prev.filter(f => f.id !== id));
+    // Ungroup items in this folder
+    setHorizonItems(prev => prev.map(i => i.folderId === id ? { ...i, folderId: null } : i));
+  };
+  const moveFolderUp = (id) => {
+    setHzFolders(prev => {
+      const idx = prev.findIndex(f => f.id === id);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      return next;
+    });
+  };
+  const moveFolderDown = (id) => {
+    setHzFolders(prev => {
+      const idx = prev.findIndex(f => f.id === id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return next;
+    });
+  };
+  const moveItemUp = (itemId) => {
+    setHorizonItems(prev => {
+      const idx = prev.findIndex(i => i.id === itemId);
+      if (idx <= 0) return prev;
+      const item = prev[idx];
+      const itemTier = getRadarTier(item.dueDate);
+      // Find previous item in the same tier
+      for (let j = idx - 1; j >= 0; j--) {
+        if (getRadarTier(prev[j].dueDate) === itemTier) {
+          const next = [...prev];
+          [next[j], next[idx]] = [next[idx], next[j]];
+          return next;
+        }
+      }
+      return prev;
+    });
+  };
+  const moveItemDown = (itemId) => {
+    setHorizonItems(prev => {
+      const idx = prev.findIndex(i => i.id === itemId);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const item = prev[idx];
+      const itemTier = getRadarTier(item.dueDate);
+      // Find next item in the same tier
+      for (let j = idx + 1; j < prev.length; j++) {
+        if (getRadarTier(prev[j].dueDate) === itemTier) {
+          const next = [...prev];
+          [next[idx], next[j]] = [next[j], next[idx]];
+          return next;
+        }
+      }
+      return prev;
+    });
+  };
+  const assignToFolder = (itemId, folderId) => {
+    setHorizonItems(prev => prev.map(i => i.id === itemId ? { ...i, folderId: folderId || null } : i));
+  };
 
   // --- Brain Dump State (Step 1) ---
   const [tasks, setTasks] = useState(() => {
@@ -1135,6 +1224,10 @@ function App() {
 
   // --- Horizon State (continued) ---
   const [hzScreen, setHzScreen] = useState("dashboard"); // dashboard, capture, edit
+  const [collapsedTiers, setCollapsedTiers] = useState(new Set());
+  const [hzView, setHzView] = useState("timeline"); // "timeline" or "folders"
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState(new Set());
+  const [ungroupedCollapsed, setUngroupedCollapsed] = useState(false);
   const [hzCaptureStep, setHzCaptureStep] = useState(0);
   const [hzCaptureData, setHzCaptureData] = useState({});
   const [hzEditId, setHzEditId] = useState(null);
@@ -1398,20 +1491,45 @@ function App() {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const parsed = parseCSV(ev.target.result);
-        if (parsed.length === 0) { alert("No tasks found in CSV."); return; }
-        setTasks(prev => {
-          // Filter out empty rows, then append imported tasks
-          const existing = prev.filter(t => (t.text || "").trim());
-          const newTasks = parsed.map(pt => ({
-            id: Date.now() + Math.random(),
-            text: pt.text,
-            minutes: pt.minutes,
-            quadrant: pt.quadrant || "",
-            promotedFrom: pt.promotedFrom || ""
-          }));
-          const result = [...existing, ...newTasks];
-          return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
-        });
+        if (parsed.length === 0) { alert("No data found in CSV."); return; }
+
+        // Split into Launch and Horizon rows
+        const launchRows = parsed.filter(r => r.source === "Launch" || (!r.source.startsWith("Horizon")));
+        const horizonRows = parsed.filter(r => r.source === "Horizon");
+
+        // Import Launch tasks
+        if (launchRows.length > 0) {
+          setTasks(prev => {
+            const existing = prev.filter(t => (t.text || "").trim());
+            const newTasks = launchRows.map(pt => ({
+              id: Date.now() + Math.random(),
+              text: pt.text,
+              minutes: pt.minutes,
+              quadrant: pt.quadrant || "",
+              promotedFrom: pt.promotedFrom || ""
+            }));
+            const result = [...existing, ...newTasks];
+            return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
+          });
+        }
+
+        // Import Horizon items (skip chunks — they're sub-rows)
+        if (horizonRows.length > 0) {
+          const newHzItems = horizonRows.map(r => {
+            const item = createHorizonItem(r.type || "task", r.text, r.dueDate || "");
+            item.dateConfirmed = r.dateStatus === "Confirmed";
+            item.size = r.size || "S";
+            // Backdate lastReviewed on import so pulse checks fire immediately
+            item.lastReviewed = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            return item;
+          });
+          setHorizonItems(prev => [...prev, ...newHzItems]);
+        }
+
+        const msg = [];
+        if (launchRows.length > 0) msg.push(launchRows.length + " Launch task" + (launchRows.length !== 1 ? "s" : ""));
+        if (horizonRows.length > 0) msg.push(horizonRows.length + " Horizon item" + (horizonRows.length !== 1 ? "s" : ""));
+        alert("Imported: " + msg.join(", "));
       };
       reader.readAsText(file);
     };
@@ -1936,7 +2054,7 @@ update();
 
   const addTaskToBlock = (blockId, taskId) => {
     if (!taskId) return;
-    const tid = parseInt(taskId);
+    const tid = parseFloat(taskId);
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
     const task = tasks.find(t => t.id === tid);
@@ -2119,8 +2237,8 @@ update();
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
                   {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0 }} />}
-                  {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "20", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0 }}>{task.promotedFrom}</span>}
-                  <span style={{ fontSize: 11, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "20", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.promotedFrom}</span>}
+                  <span style={{ fontSize: 11, color: T.text, wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.4 }}>
                     {task.text}
                   </span>
                 </div>
@@ -2274,7 +2392,7 @@ update();
                       Drop tasks here or use the menu below
                     </div>
                   ) : (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
                       {block.taskIds.map(tid => {
                         const task = tasks.find(t => t.id === tid);
                         if (!task) return null;
@@ -2295,13 +2413,14 @@ update();
                               border: `1px solid ${q ? q.color + "44" : T.border}`,
                               borderRadius: 6, padding: "4px 8px",
                               cursor: "grab", opacity: isCompleted ? 0.4 : (dragTaskId === tid ? 0.4 : 1),
-                              textDecoration: isCompleted ? "line-through" : "none"
+                              textDecoration: isCompleted ? "line-through" : "none",
+                              width: "100%", boxSizing: "border-box"
                           }}>
-                            {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color }} />}
+                            {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0 }} />}
                             <input type="checkbox" checked={isCompleted} onChange={(e) => { e.stopPropagation(); toggleTaskComplete(tid); }} style={{ cursor: "pointer", flexShrink: 0 }} />
-                            {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal }}>{task.promotedFrom}</span>}
-                            <span style={{ fontSize: 11, color: T.text }}>{task.text}</span>
-                            <span style={{ ...lbl, fontSize: 9, color: q ? q.color : T.textDim }}>{task.minutes}M</span>
+                            {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.promotedFrom}</span>}
+                            <span style={{ fontSize: 11, color: T.text, flex: 1, wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.4 }}>{task.text}</span>
+                            <span style={{ ...lbl, fontSize: 9, color: q ? q.color : T.textDim, flexShrink: 0 }}>{task.minutes}M</span>
                             <button onClick={() => removeTaskFromBlock(block.id, tid)} style={{
                               background: "transparent", border: "none", cursor: "pointer",
                               color: T.textDim, fontSize: 12, padding: "0 2px"
@@ -2919,9 +3038,27 @@ update();
   const [hzSendMode, setHzSendMode] = useState("new"); // "new" or "existing"
   const [hzSendName, setHzSendName] = useState("");
   const [hzSendExisting, setHzSendExisting] = useState("");
+  const [hzSelectMode, setHzSelectMode] = useState(false); // bulk select mode
+  const [hzSelected, setHzSelected] = useState(new Set()); // selected item IDs
+
+  const toggleHzSelect = (id) => setHzSelected(prev => {
+    const next = new Set([...prev]);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const exitHzSelectMode = () => { setHzSelectMode(false); setHzSelected(new Set()); };
+  const bulkDeleteHzItems = () => {
+    if (hzSelected.size === 0) return;
+    if (confirm(`Delete ${hzSelected.size} item${hzSelected.size !== 1 ? "s" : ""}? This cannot be undone.`)) {
+      const selectedFolderIds = hzSelected;
+      setHorizonItems(prev => prev.filter(i => !hzSelected.has(i.id)).map(i => selectedFolderIds.has(i.folderId) ? { ...i, folderId: null } : i));
+      setHzFolders(prev => prev.filter(f => !hzSelected.has(f.id)));
+      exitHzSelectMode();
+    }
+  };
 
   const startCapture = () => {
-    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", chunks: [] });
+    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", folderId: "", chunks: [] });
     setHzCaptureStep(0);
     setHzScreen("capture");
   };
@@ -2933,6 +3070,7 @@ update();
     item.size = d.size;
     item.repeat = d.repeat || "none";
     item.pulseFreq = d.pulseFreq || "medium";
+    item.autoRefresh = d.autoRefresh !== false;
     if (d.type === "project" && d.chunks && d.chunks.length > 0) {
       item.chunks = d.chunks.filter(c => c.trim()).map((c, i) => ({ id: "chunk_" + Date.now() + "_" + i, name: c, done: false }));
     }
@@ -2959,7 +3097,7 @@ update();
         const existing = horizonItems.find(i => i.id === hzEditId);
         if (!existing) return;
         const updates = {
-          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none", pulseFreq: d.pulseFreq || "medium",
+          name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none", pulseFreq: d.pulseFreq || "medium", autoRefresh: d.autoRefresh !== false, folderId: d.folderId || null,
           lastReviewed: new Date().toISOString()
         };
         if (existing.type === "project") {
@@ -3049,6 +3187,52 @@ update();
                 ))}
               </div>
             </div>
+            {/* Auto-Refresh (only for repeating items) */}
+            {(d.repeat && d.repeat !== "none") && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>AUTO-REFRESH ON REPEAT</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[{id:true,label:"AUTO",desc:"Reset automatically"},{id:false,label:"PROMPT",desc:"Ask me first"}].map(opt => (
+                    <button key={String(opt.id)} onClick={() => update("autoRefresh", opt.id)} style={{
+                      flex: 1, padding: "8px", borderRadius: 6, cursor: "pointer", textAlign: "center",
+                      background: (d.autoRefresh !== false ? true : false) === opt.id ? C.teal + "22" : "transparent",
+                      border: `1px solid ${(d.autoRefresh !== false ? true : false) === opt.id ? C.teal : T.border}`,
+                      ...lbl, fontSize: 9, color: (d.autoRefresh !== false ? true : false) === opt.id ? C.teal : T.textDim
+                    }}>
+                      <div>{opt.label}</div>
+                      <div style={{ fontSize: 8, fontWeight: 400, marginTop: 2 }}>{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Folder */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>FOLDER</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <select value={d.folderId || ""} onChange={e => update("folderId", e.target.value || "")} style={{
+                  flex: 1, padding: "8px", borderRadius: 6,
+                  background: T.inputBg, border: `1px solid ${T.border}`, color: T.text,
+                  fontSize: 12, fontFamily: "'Montserrat', sans-serif", cursor: "pointer"
+                }}>
+                  <option value="">No folder</option>
+                  {hzFolders.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <button onClick={() => {
+                  const name = prompt("New folder name:");
+                  if (name && name.trim()) {
+                    const id = addFolder(name.trim());
+                    update("folderId", id);
+                  }
+                }} style={{
+                  padding: "8px 12px", borderRadius: 6, cursor: "pointer",
+                  background: C.purple + "15", border: `1px solid ${C.purple}44`,
+                  ...lbl, fontSize: 9, color: C.purple, whiteSpace: "nowrap"
+                }}>+ NEW</button>
+              </div>
+            </div>
             {/* Chunks (projects only) */}
             {d.type === "project" && (
               <div style={{ marginBottom: 16 }}>
@@ -3106,7 +3290,7 @@ update();
             </div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               {[{id:"task",icon:"✓",label:"Single Task"},{id:"project",icon:"▦",label:"Project"}].map(t => (
-                <button key={t.id} onClick={() => { update("type", t.id); setHzCaptureStep(1); }} style={{
+                <button key={t.id} onClick={() => { update("type", t.id); }} style={{
                   padding: "24px 32px", borderRadius: 8, cursor: "pointer",
                   background: T.card, border: `2px solid ${d.type === t.id ? C.teal : T.border}`,
                   ...lbl, fontSize: 14, color: T.text, transition: "all 0.15s"
@@ -3148,7 +3332,7 @@ update();
             <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>Confirmed = hard deadline. Suggested = your best guess.</div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               {[{id:true,icon:"◆",label:"Confirmed"},{id:false,icon:"◇",label:"Suggested"}].map(opt => (
-                <button key={String(opt.id)} onClick={() => { update("dateConfirmed", opt.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                <button key={String(opt.id)} onClick={() => { update("dateConfirmed", opt.id); }} style={{
                   padding: "24px 32px", borderRadius: 8, cursor: "pointer",
                   background: T.card, border: `2px solid ${d.dateConfirmed === opt.id ? C.teal : T.border}`,
                   fontSize: 14, fontWeight: 700, color: T.text, transition: "all 0.15s"
@@ -3164,7 +3348,7 @@ update();
             <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>A rough sense of effort. Don't overthink it.</div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               {[{id:"S",label:"Small",desc:"Under an hour"},{id:"M",label:"Medium",desc:"A few hours"},{id:"L",label:"Large",desc:"Multiple sessions"}].map(s => (
-                <button key={s.id} onClick={() => { update("size", s.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                <button key={s.id} onClick={() => { update("size", s.id); }} style={{
                   padding: "20px 24px", borderRadius: 8, cursor: "pointer", textAlign: "center",
                   background: T.card, border: `2px solid ${d.size === s.id ? C.teal : T.border}`,
                   transition: "all 0.15s", minWidth: 120
@@ -3203,7 +3387,7 @@ update();
             <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>Repeating items auto-reset after completion on their cycle.</div>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
               {[{id:"none",label:"No Repeat",desc:"One-off"},{id:"daily",label:"Daily",desc:"Resets every day"},{id:"weekly",label:"Weekly",desc:"Resets every 7 days"},{id:"monthly",label:"Monthly",desc:"Resets every 30 days"}].map(r => (
-                <button key={r.id} onClick={() => { update("repeat", r.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                <button key={r.id} onClick={() => { update("repeat", r.id); }} style={{
                   padding: "16px 20px", borderRadius: 8, cursor: "pointer", textAlign: "center",
                   background: T.card, border: `2px solid ${(d.repeat || "none") === r.id ? C.teal : T.border}`,
                   transition: "all 0.15s", minWidth: 100
@@ -3226,7 +3410,7 @@ update();
                 {id:"medium",label:"MEDIUM",desc:"Standard cadence",detail:"Based on radar tier"},
                 {id:"low",label:"LOW",desc:"Check less often",detail:"Doubles the standard cadence"}
               ].map(p => (
-                <button key={p.id} onClick={() => { update("pulseFreq", p.id); setHzCaptureStep(prev => prev + 1); }} style={{
+                <button key={p.id} onClick={() => { update("pulseFreq", p.id); }} style={{
                   padding: "16px 20px", borderRadius: 8, cursor: "pointer", textAlign: "center",
                   background: T.card, border: `2px solid ${(d.pulseFreq || "medium") === p.id ? C.teal : T.border}`,
                   transition: "all 0.15s", minWidth: 100
@@ -3301,9 +3485,7 @@ update();
         )
       ];
 
-      const canNext = hzCaptureStep === 0 ? true
-        : hzCaptureStep === 1 ? d.name.trim()
-        : true;
+      const canNext = hzCaptureStep === 1 ? d.name.trim() : true;
       const isLast = hzCaptureStep === captureSteps.length - 1;
 
       return (
@@ -3329,7 +3511,7 @@ update();
                 background: "transparent", border: `1px solid ${T.border}`, borderRadius: 6,
                 padding: "10px 20px", cursor: "pointer", ...lbl, fontSize: 10, color: T.textMid
               }}>← BACK</button>
-              {canNext && hzCaptureStep > 0 && (
+              {canNext && (
                 <button onClick={() => {
                   if (isLast) finishCapture();
                   else setHzCaptureStep(prev => prev + 1);
@@ -3344,185 +3526,56 @@ update();
       );
     }
 
-    // --- Dashboard ---
-    const tiers = ["close", "mid", "long", "someday"];
-    const hzProjects = activeHzItems.filter(i => i.type === "project");
-    const needsAttention = activeHzItems.filter(i => isOverdueForReview(i));
-    const pastDueItems = activeHzItems.filter(i => isPastDue(i));
-
-    return (
-      <div style={{ padding: "16px 12px", maxWidth: 900, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div>
-            <div style={{ fontSize: 11, color: T.textDim }}>
-              {activeHzItems.length} item{activeHzItems.length !== 1 ? "s" : ""} on your radar
-              {needsAttention.length > 0 && (
-                <span style={{ color: C.amber, fontWeight: 700 }}> · {needsAttention.length} need{needsAttention.length === 1 ? "s" : ""} attention</span>
-              )}
-            </div>
-          </div>
-          <button onClick={startCapture} style={{
-            background: C.teal, color: "#FFF", border: "none", borderRadius: 6,
-            padding: "10px 20px", cursor: "pointer", ...lbl, fontSize: 11
-          }}>+ NEW ITEM</button>
-        </div>
-
-        {/* Pulse check banner */}
-        {needsAttention.length > 0 && (
-          <div style={{
-            background: C.amber + "12", border: `1px solid ${C.amber}33`, borderRadius: 8,
-            padding: "12px 16px", marginBottom: 16
-          }}>
-            <div style={{ ...lbl, fontSize: 10, color: C.amber, marginBottom: 10 }}>
-              ⚠ PULSE CHECK — {needsAttention.length} ITEM{needsAttention.length !== 1 ? "S" : ""} NEED YOUR ATTENTION
-            </div>
-            {needsAttention.map(item => {
-              const esc = getEscalationLevel(item);
-              const escColor = esc >= 2 ? C.red : C.amber;
-              const days = daysSinceReview(item);
-              return (
-                <div key={item.id} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 10px", marginBottom: 4, borderRadius: 6,
-                  background: T.card, border: `1px solid ${escColor}33`
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                    <span style={{ position: "relative", flexShrink: 0 }}>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
-                        background: item.type === "project" ? C.purple : C.teal, color: "#FFF",
-                        display: "inline-block"
-                      }}>{item.type === "project" ? "P" : "T"}</span>
-                      {(() => {
-                        const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
-                        return outstanding > 0 ? (
-                          <span style={{
-                            position: "absolute", top: -5, right: -7,
-                            width: 14, height: 14, borderRadius: "50%",
-                            background: C.red, color: "#FFF",
-                            fontSize: 8, fontWeight: 900,
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                          }}>{outstanding}</span>
-                        ) : null;
-                      })()}
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.name}
-                    </span>
-                    <span style={{ ...lbl, fontSize: 8, color: escColor, flexShrink: 0 }}>
-                      {days}d since last check
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                    <button onClick={() => markReviewed(item.id)} style={{
-                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                      background: C.green + "15", border: `1px solid ${C.green}44`,
-                      ...lbl, fontSize: 8, color: C.green
-                    }}>✓ ON TRACK</button>
-                    <button onClick={() => {
-                      setHzEditId(item.id);
-                      setHzCaptureData({
-                        type: item.type, name: item.name, dueDate: item.dueDate || "",
-                        dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                        repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
-                        chunks: item.chunks ? item.chunks.map(c => c.name) : []
-                      });
-                      setHzCaptureStep(1);
-                      setHzScreen("edit");
-                    }} style={{
-                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                      background: C.amber + "15", border: `1px solid ${C.amber}44`,
-                      ...lbl, fontSize: 8, color: C.amber
-                    }}>✎ UPDATE</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Past due warning */}
-        {pastDueItems.length > 0 && (
-          <div style={{
-            background: C.red + "12", border: `1px solid ${C.red}33`, borderRadius: 8,
-            padding: "12px 16px", marginBottom: 16
-          }}>
-            <div style={{ ...lbl, fontSize: 10, color: C.red, marginBottom: 8 }}>
-              ⚠ OVERDUE — {pastDueItems.length} ITEM{pastDueItems.length !== 1 ? "S" : ""} PAST DUE DATE
-            </div>
-            {pastDueItems.map(item => (
-              <div key={item.id} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text
-              }}>
-                <span style={{ fontWeight: 700 }}>{item.name}</span>
-                <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeHzItems.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: T.textDim }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>◎</div>
-            <div style={{ fontSize: 13 }}>Nothing on the horizon yet.</div>
-          </div>
-        ) : tiers.map(tierId => {
-          const tier = TIER_DISPLAY[tierId];
-          const tierItems = activeHzItems.filter(item => getRadarTier(item.dueDate) === tierId);
-          if (tierItems.length === 0) return null;
-          return (
-            <div key={tierId} style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: tier.color }} />
-                  <span style={{ ...lbl, fontSize: 11, color: tier.color }}>{tier.label}</span>
-                  <span style={{ fontSize: 10, color: T.textDim }}>{tier.range}</span>
-                </div>
-                <span style={{ fontSize: 10, color: T.textDim }}>{tierItems.length} item{tierItems.length !== 1 ? "s" : ""}</span>
-              </div>
-              {tierItems.map(item => {
+    const renderItemCard = (item, tier) => {
                 const days = daysUntil(item.dueDate);
                 const chunksDone = item.chunks ? item.chunks.filter(c => c.done).length : 0;
                 const chunksTotal = item.chunks ? item.chunks.length : 0;
                 const esc = getEscalationLevel(item);
                 const escBorder = esc >= 2 ? C.red : esc === 1 ? C.amber : tier.color + "33";
                 const overdue = isPastDue(item);
+                const isSelected = hzSelected.has(item.id);
                 return (
                   <div key={item.id} style={{
                     background: T.card,
-                    border: `${esc >= 2 ? "2px" : "1px"} solid ${overdue ? C.red : escBorder}`,
+                    border: `${isSelected ? "2px" : esc >= 2 ? "2px" : "1px"} solid ${isSelected ? C.purple : overdue ? C.red : escBorder}`,
                     borderRadius: 8, padding: "12px 14px", marginBottom: 6,
-                    transition: "border 0.3s"
+                    transition: "border 0.3s",
+                    position: "relative"
                   }}>
+                    {/* Bulk select checkbox — only visible in select mode */}
+                    {hzSelectMode && (
+                      <div onClick={() => toggleHzSelect(item.id)} style={{
+                        position: "absolute", top: 10, right: 10,
+                        width: 20, height: 20, borderRadius: 4, cursor: "pointer",
+                        background: isSelected ? C.purple : "transparent",
+                        border: `2px solid ${isSelected ? C.purple : T.border}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, zIndex: 2
+                      }}>
+                        {isSelected && <span style={{ color: "#FFF", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                      </div>
+                    )}
                     {/* Escalation badge */}
-                    {(esc > 0 || overdue) && (
+                    {esc > 0 && !overdue && (
                       <div style={{
                         display: "flex", alignItems: "center", gap: 6, marginBottom: 8
                       }}>
-                        {overdue && (
-                          <span style={{
-                            padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 8,
-                            background: C.red + "20", color: C.red, border: `1px solid ${C.red}44`
-                          }}>⚠ {Math.abs(days)}D OVERDUE</span>
-                        )}
-                        {esc > 0 && !overdue && (
-                          <span style={{
+                        <span style={{
                             padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 8,
                             background: (esc >= 2 ? C.red : C.amber) + "20",
                             color: esc >= 2 ? C.red : C.amber,
                             border: `1px solid ${(esc >= 2 ? C.red : C.amber)}44`
-                          }}>⚠ {daysSinceReview(item)}D SINCE LAST CHECK</span>
-                        )}
+                        }}>⚠ {daysSinceReview(item)}D SINCE LAST CHECK</span>
                       </div>
                     )}
-                    {/* Row 1: Type badge + repeat + Days */}
+                    {/* Row 1: Type badge + repeat + meta + Days */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1 }}>
                         <span style={{ position: "relative" }}>
                           <span style={{
                             padding: "0 12px", borderRadius: 6, ...lbl, fontSize: 9, letterSpacing: "1.5px",
                             background: item.type === "project" ? C.purple : C.teal,
+                            border: dark ? `1px solid rgba(255,255,255,0.3)` : "none",
                             color: "#FFFFFF", height: 24, display: "inline-flex", alignItems: "center"
                           }}>{item.type.toUpperCase()}</span>
                           {(() => {
@@ -3544,13 +3597,68 @@ update();
                             background: C.amber, color: "#FFFFFF", height: 24, display: "inline-flex", alignItems: "center"
                           }}>{item.repeat.toUpperCase()}</span>
                         )}
+                        {item.dueDate && <span style={{
+                          padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                          background: dark ? "rgba(255,255,255,0.06)" : "#F0F0F0",
+                          color: T.textDim,
+                          border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}`
+                        }}>{new Date(item.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                        {item.dueDate && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                            background: dark ? "rgba(255,255,255,0.06)" : "#F0F0F0",
+                            color: T.textDim,
+                            border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}`
+                          }}>{item.dateConfirmed ? "◆ CONFIRMED" : "◇ SUGGESTED"}</span>
+                        )}
+                        {item.size && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                            background: dark ? "rgba(255,255,255,0.06)" : "#F0F0F0",
+                            color: T.textDim,
+                            border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}`
+                          }}>SIZE: {item.size}</span>
+                        )}
+                        {item.pulseFreq && item.pulseFreq !== "medium" && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                            background: dark ? "rgba(255,255,255,0.06)" : "#F0F0F0",
+                            color: T.textDim,
+                            border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}`
+                          }}>PULSE: {item.pulseFreq.toUpperCase()}</span>
+                        )}
+                        {chunksTotal > 0 && (
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
+                            background: dark ? "rgba(255,255,255,0.06)" : "#F0F0F0",
+                            color: T.textDim,
+                            border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "#E0E0E0"}`
+                          }}>{chunksDone}/{chunksTotal} STEPS</span>
+                        )}
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ textAlign: "center", flexShrink: 0, minWidth: 50 }}>
                         {item.dueDate ? (
-                          <>
-                            <div style={{ fontSize: 24, fontWeight: 900, color: tier.color }}>{days}</div>
-                            <div style={{ ...lbl, fontSize: 8, color: tier.color }}>days</div>
-                          </>
+                          overdue ? (
+                            <>
+                              <div style={{ marginBottom: 2 }}>
+                                <div style={{ fontSize: 10, fontWeight: 900, color: T.textDim }}>0</div>
+                                <div style={{ ...lbl, fontSize: 7, color: T.textDim }}>days</div>
+                              </div>
+                              <div style={{
+                                marginTop: 4, padding: "4px 10px", borderRadius: 6,
+                                background: C.red + "20", border: `1px solid ${C.red}44`,
+                                textAlign: "center"
+                              }}>
+                                <div style={{ fontSize: 20, fontWeight: 900, color: C.red }}>{Math.abs(days)}</div>
+                                <div style={{ ...lbl, fontSize: 7, color: C.red }}>overdue</div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 24, fontWeight: 900, color: tier.color }}>{days}</div>
+                              <div style={{ ...lbl, fontSize: 8, color: tier.color }}>days</div>
+                            </>
+                          )
                         ) : <div style={{ ...lbl, fontSize: 8, color: T.textFaint }}>no date</div>}
                       </div>
                     </div>
@@ -3560,43 +3668,14 @@ update();
                         {item.name}
                       </span>
                     </div>
-                    {/* Row 2: Meta info */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
-                      {item.dueDate && <span style={{ fontSize: 11, color: T.textDim }}>
-                        {new Date(item.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                      </span>}
-                      {item.dueDate && (
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
-                          background: item.dateConfirmed ? C.green + "15" : C.amber + "15",
-                          color: item.dateConfirmed ? C.green : C.amber,
-                          border: `1px solid ${item.dateConfirmed ? C.green + "33" : C.amber + "33"}`
-                        }}>{item.dateConfirmed ? "◆ CONFIRMED" : "◇ SUGGESTED"}</span>
-                      )}
-                      {item.size && (
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
-                          background: T.border + "44", color: T.textDim
-                        }}>SIZE: {item.size}</span>
-                      )}
-                      {item.pulseFreq && item.pulseFreq !== "medium" && (
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 4, fontSize: 9, ...lbl,
-                          background: (item.pulseFreq === "high" ? C.red : C.green) + "15",
-                          color: item.pulseFreq === "high" ? C.red : C.green,
-                          border: `1px solid ${(item.pulseFreq === "high" ? C.red : C.green)}33`
-                        }}>PULSE: {item.pulseFreq.toUpperCase()}</span>
-                      )}
-                      {chunksTotal > 0 && (
-                        <span style={{ fontSize: 10, color: T.textDim }}>{chunksDone}/{chunksTotal} steps</span>
-                      )}
-                      {item.promoted && (
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 4, fontSize: 8, ...lbl,
-                          background: C.green + "15", color: C.green, border: `1px solid ${C.green}33`
-                        }}>PROMOTED</span>
-                      )}
-                    </div>
+                    {/* Meta continued: promoted badge + progress bar + chunks */}
+                    {item.promoted && (
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 4, fontSize: 8, ...lbl,
+                        background: C.green + "15", color: C.green, border: `1px solid ${C.green}33`,
+                        display: "inline-block", marginTop: 4
+                      }}>PROMOTED</span>
+                    )}
                     {/* Progress bar for projects */}
                     {chunksTotal > 0 && chunksDone > 0 && (
                       <div style={{ marginTop: 8 }}>
@@ -3627,7 +3706,16 @@ update();
                         ))}
                       </div>
                     )}
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                      {item.needsRefreshPrompt && (
+                        <button onClick={() => {
+                          setHorizonItems(prev => prev.map(i => i.id === item.id ? resetRepeatItem({ ...i, needsRefreshPrompt: false }) : i));
+                        }} style={{
+                          padding: "4px 10px", borderRadius: 4, cursor: "pointer",
+                          background: C.amber + "25", border: `2px solid ${C.amber}`,
+                          ...lbl, fontSize: 8, color: C.amber
+                        }}>🔄 READY TO REFRESH?</button>
+                      )}
                       <button onClick={() => {
                         if (item.type === "project" && item.chunks && item.chunks.filter(c => !c.done).length > 0) {
                           setHzPromoteModal(item.id);
@@ -3655,7 +3743,7 @@ update();
                         setHzCaptureData({
                           type: item.type, name: item.name, dueDate: item.dueDate || "",
                           dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
+                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
                           chunks: item.chunks ? item.chunks.map(c => c.name) : []
                         });
                         setHzCaptureStep(1);
@@ -3672,6 +3760,18 @@ update();
                         padding: "4px 10px", borderRadius: 4, cursor: "pointer",
                         background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 8, color: T.textDim
                       }}>✕</button>
+                    </div>
+                    {/* Move controls */}
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center" }}>
+                      <button onClick={() => moveItemUp(item.id)} style={{
+                        padding: "3px 8px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 10, color: T.textDim
+                      }}>↑</button>
+                      <button onClick={() => moveItemDown(item.id)} style={{
+                        padding: "3px 8px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 10, color: T.textDim
+                      }}>↓</button>
+                    </div>
 
                       {/* Horizon ICS Export Modal */}
                       {hzIcsModal === item.id && (
@@ -3861,12 +3961,360 @@ update();
                         </div>
                       )}
                     </div>
-                  </div>
                 );
-              })}
+    };
+
+    // --- Dashboard ---
+    const tiers = ["close", "mid", "long", "someday"];
+    const hzProjects = activeHzItems.filter(i => i.type === "project");
+    const needsAttention = activeHzItems.filter(i => isOverdueForReview(i));
+    const pastDueItems = activeHzItems.filter(i => isPastDue(i));
+
+    return (
+      <div style={{ padding: "16px 12px", maxWidth: 900, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, color: T.textDim }}>
+              {activeHzItems.length} item{activeHzItems.length !== 1 ? "s" : ""} on your radar
+              {needsAttention.length > 0 && (
+                <span style={{ color: C.amber, fontWeight: 700 }}> · {needsAttention.length} need{needsAttention.length === 1 ? "s" : ""} attention</span>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => { if (hzSelectMode) exitHzSelectMode(); else setHzSelectMode(true); }} style={{
+              background: "transparent", color: hzSelectMode ? C.red : T.textFaint,
+              border: `1px solid ${hzSelectMode ? C.red : T.border}`, borderRadius: 6,
+              padding: "6px 12px", cursor: "pointer", ...lbl, fontSize: 9, letterSpacing: "1px"
+            }}>{hzSelectMode ? "✕ CANCEL" : "SELECT"}</button>
+            <button onClick={() => {
+              const name = prompt("Folder name:");
+              if (name && name.trim()) addFolder(name.trim());
+            }} style={{
+              background: "transparent", color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 6,
+              padding: "10px 16px", cursor: "pointer", ...lbl, fontSize: 11
+            }}>+ FOLDER</button>
+            <button onClick={startCapture} style={{
+              background: C.teal, color: "#FFF", border: "none", borderRadius: 6,
+              padding: "10px 20px", cursor: "pointer", ...lbl, fontSize: 11
+            }}>+ NEW ITEM</button>
+          </div>
+        </div>
+
+        {/* View toggle tabs */}
+        <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
+          <button onClick={() => setHzView("timeline")} style={{
+            flex: 1, padding: "10px 16px", cursor: "pointer",
+            background: hzView === "timeline" ? (dark ? "rgba(255,255,255,0.06)" : C.red + "10") : "transparent",
+            border: `1px solid ${hzView === "timeline" ? (dark ? "rgba(255,255,255,0.15)" : C.red + "44") : T.border}`,
+            borderLeft: hzView === "timeline" ? `4px solid ${C.red}` : `1px solid ${T.border}`,
+            borderRadius: "8px 0 0 8px",
+            ...lbl, fontSize: 11, letterSpacing: "1.5px",
+            color: hzView === "timeline" ? (dark ? "#FFFFFF" : C.red) : T.textDim
+          }}>⏱ BY TIMELINE</button>
+          <button onClick={() => setHzView("folders")} style={{
+            flex: 1, padding: "10px 16px", cursor: "pointer",
+            background: hzView === "folders" ? (dark ? "rgba(255,255,255,0.06)" : C.purple + "10") : "transparent",
+            border: `1px solid ${hzView === "folders" ? (dark ? "rgba(255,255,255,0.15)" : C.purple + "44") : T.border}`,
+            borderLeft: hzView === "folders" ? `4px solid ${C.purple}` : `1px solid ${T.border}`,
+            borderRadius: "0 8px 8px 0",
+            ...lbl, fontSize: 11, letterSpacing: "1.5px",
+            color: hzView === "folders" ? (dark ? "#FFFFFF" : C.purple) : T.textDim
+          }}>📁 BY FOLDER</button>
+        </div>
+
+        {/* Pulse check banner */}
+        {needsAttention.length > 0 && (
+          <div style={{
+            background: C.amber + "12", border: `1px solid ${C.amber}33`, borderRadius: 8,
+            padding: "12px 16px", marginBottom: 16
+          }}>
+            <div style={{ ...lbl, fontSize: 10, color: C.amber, marginBottom: 10 }}>
+              ⚠ PULSE CHECK — {needsAttention.length} ITEM{needsAttention.length !== 1 ? "S" : ""} NEED YOUR ATTENTION
+            </div>
+            {needsAttention.map(item => {
+              const esc = getEscalationLevel(item);
+              const escColor = esc >= 2 ? C.red : C.amber;
+              const days = daysSinceReview(item);
+              return (
+                <div key={item.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "8px 10px", marginBottom: 4, borderRadius: 6,
+                  background: T.card, border: `1px solid ${escColor}33`
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                    <span style={{ position: "relative", flexShrink: 0 }}>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
+                        background: item.type === "project" ? C.purple : C.teal, color: "#FFF",
+                        border: dark ? `1px solid rgba(255,255,255,0.3)` : "none",
+                        display: "inline-block"
+                      }}>{item.type === "project" ? "P" : "T"}</span>
+                      {(() => {
+                        const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
+                        return outstanding > 0 ? (
+                          <span style={{
+                            position: "absolute", top: -5, right: -7,
+                            width: 14, height: 14, borderRadius: "50%",
+                            background: C.red, color: "#FFF",
+                            fontSize: 8, fontWeight: 900,
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                          }}>{outstanding}</span>
+                        ) : null;
+                      })()}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.name}
+                    </span>
+                    <span style={{ ...lbl, fontSize: 8, color: escColor, flexShrink: 0 }}>
+                      {days}d since last check
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <button onClick={() => markReviewed(item.id)} style={{
+                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
+                      background: C.green + "15", border: `1px solid ${C.green}44`,
+                      ...lbl, fontSize: 8, color: C.green
+                    }}>✓ ON TRACK</button>
+                    <button onClick={() => {
+                      setHzEditId(item.id);
+                      setHzCaptureData({
+                        type: item.type, name: item.name, dueDate: item.dueDate || "",
+                        dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
+                        repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
+                        chunks: item.chunks ? item.chunks.map(c => c.name) : []
+                      });
+                      setHzCaptureStep(1);
+                      setHzScreen("edit");
+                    }} style={{
+                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
+                      background: C.amber + "15", border: `1px solid ${C.amber}44`,
+                      ...lbl, fontSize: 8, color: C.amber
+                    }}>✎ UPDATE</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Past due warning */}
+        {pastDueItems.length > 0 && (
+          <div style={{
+            background: C.red + "12", border: `1px solid ${C.red}33`, borderRadius: 8,
+            padding: "12px 16px", marginBottom: 16
+          }}>
+            <div style={{ ...lbl, fontSize: 10, color: C.red, marginBottom: 8 }}>
+              ⚠ OVERDUE — {pastDueItems.length} ITEM{pastDueItems.length !== 1 ? "S" : ""} PAST DUE DATE
+            </div>
+            {pastDueItems.map(item => (
+              <div key={item.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text
+              }}>
+                <span style={{ fontWeight: 700 }}>{item.name}</span>
+                <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* === FOLDERS VIEW === */}
+        {hzView === "folders" && (
+          <div>
+            {hzFolders.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: T.textDim }}>
+                <div style={{ fontSize: 13 }}>No folders yet. Create one with + FOLDER above.</div>
+              </div>
+            ) : hzFolders.map(folder => {
+              const folderItems = activeHzItems.filter(i => i.folderId === folder.id);
+              const overdueCount = folderItems.filter(i => isPastDue(i)).length;
+              const needsReviewCount = folderItems.filter(i => isOverdueForReview(i)).length;
+              const fCollapsed = collapsedFolderIds.has(folder.id);
+              const folderSelected = hzSelected.has(folder.id);
+              const allFolderItemsSelected = folderItems.length > 0 && folderItems.every(i => hzSelected.has(i.id));
+              return (
+                <div key={folder.id} style={{ marginBottom: 12 }}>
+                  {/* Folder banner — matches tier banner style */}
+                  <div onClick={() => {
+                    if (hzSelectMode) {
+                      // In select mode: toggle folder itself + all its items
+                      setHzSelected(prev => {
+                        const next = new Set([...prev]);
+                        if (allFolderItemsSelected && next.has(folder.id)) {
+                          next.delete(folder.id);
+                          folderItems.forEach(i => next.delete(i.id));
+                        } else {
+                          next.add(folder.id);
+                          folderItems.forEach(i => next.add(i.id));
+                        }
+                        return next;
+                      });
+                      return;
+                    }
+                    setCollapsedFolderIds(prev => {
+                    const next = new Set([...prev]);
+                    next.has(folder.id) ? next.delete(folder.id) : next.add(folder.id);
+                    return next;
+                  })}} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 16px", borderRadius: 8, cursor: "pointer",
+                    background: folderSelected ? C.purple + "18" : dark ? "rgba(255,255,255,0.04)" : C.purple + "10",
+                    border: `${folderSelected ? "2px" : "1px"} solid ${folderSelected ? C.purple : dark ? "rgba(255,255,255,0.1)" : C.purple + "33"}`,
+                    borderLeft: `5px solid ${C.purple}`
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {hzSelectMode ? (
+                        <span style={{
+                          width: 18, height: 18, borderRadius: 3, flexShrink: 0,
+                          background: (allFolderItemsSelected || folderSelected) ? C.purple : "transparent",
+                          border: `2px solid ${(allFolderItemsSelected || folderSelected) ? C.purple : T.border}`,
+                          display: "inline-flex", alignItems: "center", justifyContent: "center"
+                        }}>{(allFolderItemsSelected || folderSelected) && <span style={{ color: "#FFF", fontSize: 10, fontWeight: 900 }}>✓</span>}</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: dark ? "#FFFFFF" : C.purple }}>{fCollapsed ? "▶" : "▼"}</span>
+                      )}
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: dark ? "#FFFFFF" : C.purple }} />
+                      <span style={{ ...lbl, fontSize: 14, color: dark ? "#FFFFFF" : C.purple, letterSpacing: "2px" }}>{folder.name}</span>
+                      <span style={{ fontSize: 11, color: T.textDim, fontWeight: 400 }}>({folderItems.length})</span>
+                      {overdueCount > 0 && (
+                        <span style={{
+                          width: 20, height: 20, borderRadius: "50%", background: C.red, color: "#FFF",
+                          fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center"
+                        }}>{overdueCount}</span>
+                      )}
+                      {needsReviewCount > 0 && overdueCount === 0 && (
+                        <span style={{
+                          width: 20, height: 20, borderRadius: "50%", background: C.amber, color: "#FFF",
+                          fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center"
+                        }}>{needsReviewCount}</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <button onClick={e => { e.stopPropagation(); moveFolderUp(folder.id); }} style={{
+                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
+                      }}>↑</button>
+                      <button onClick={e => { e.stopPropagation(); moveFolderDown(folder.id); }} style={{
+                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
+                      }}>↓</button>
+                      <button onClick={e => { e.stopPropagation(); const n = prompt("Rename folder:", folder.name); if (n && n.trim()) renameFolder(folder.id, n.trim()); }} style={{
+                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
+                      }}>✎</button>
+                      <button onClick={e => { e.stopPropagation(); if (confirm("Delete folder? Items will be ungrouped.")) deleteFolder(folder.id); }} style={{
+                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
+                      }}>✕</button>
+                      <span style={{ ...lbl, fontSize: 10, color: T.textDim, marginLeft: 8 }}>{folderItems.length} ITEM{folderItems.length !== 1 ? "S" : ""}</span>
+                    </div>
+                  </div>
+                  {!fCollapsed && (
+                    <div style={{ paddingTop: 8 }}>
+                      {folderItems.length === 0 ? (
+                        <div style={{ padding: "12px", textAlign: "center", fontSize: 11, color: T.textFaint }}>No items in this folder</div>
+                      ) : folderItems.map(item => {
+                        const itemTier = TIER_DISPLAY[getRadarTier(item.dueDate)];
+                        return renderItemCard(item, itemTier);
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Ungrouped items */}
+            {(() => {
+              const ungrouped = activeHzItems.filter(i => !i.folderId || !hzFolders.find(f => f.id === i.folderId));
+              if (ungrouped.length === 0) return null;
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div onClick={() => setUngroupedCollapsed(prev => !prev)} style={{
+                    padding: "12px 16px", borderRadius: 8, cursor: "pointer",
+                    background: dark ? "rgba(255,255,255,0.04)" : "#F5F5F5",
+                    border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : T.border}`,
+                    borderLeft: `5px solid ${T.border}`,
+                    marginBottom: 8,
+                    display: "flex", justifyContent: "space-between", alignItems: "center"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 12, color: dark ? "#FFFFFF" : T.textDim }}>{ungroupedCollapsed ? "▶" : "▼"}</span>
+                      <span style={{ ...lbl, fontSize: 14, color: dark ? "#FFFFFF" : T.textDim, letterSpacing: "2px" }}>UNGROUPED</span>
+                      <span style={{ fontSize: 11, color: T.textDim }}>({ungrouped.length})</span>
+                    </div>
+                    <span style={{ ...lbl, fontSize: 10, color: T.textDim }}>{ungrouped.length} ITEM{ungrouped.length !== 1 ? "S" : ""}</span>
+                  </div>
+                  {!ungroupedCollapsed && (
+                    <div style={{ paddingTop: 4 }}>
+                      {ungrouped.map(item => {
+                        const itemTier = TIER_DISPLAY[getRadarTier(item.dueDate)];
+                        return renderItemCard(item, itemTier);
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* === TIMELINE VIEW === */}
+        {hzView === "timeline" && (activeHzItems.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: T.textDim }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>◎</div>
+            <div style={{ fontSize: 13 }}>Nothing on the horizon yet.</div>
+          </div>
+        ) : tiers.map(tierId => {
+          const tier = TIER_DISPLAY[tierId];
+          const tierItems = activeHzItems.filter(item => getRadarTier(item.dueDate) === tierId);
+          if (tierItems.length === 0) return null;
+          const tierCollapsed = collapsedTiers.has(tierId);
+          const ungroupedItems = tierItems.filter(i => !i.folderId || !hzFolders.find(f => f.id === i.folderId));
+          const overdueInTier = tierItems.filter(i => isPastDue(i)).length;
+          const needsReviewInTier = tierItems.filter(i => isOverdueForReview(i)).length;
+          return (
+            <div key={tierId} style={{ marginBottom: 12 }}>
+              {/* Tier banner */}
+              <div onClick={() => setCollapsedTiers(prev => {
+                const next = new Set([...prev]);
+                next.has(tierId) ? next.delete(tierId) : next.add(tierId);
+                return next;
+              })} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "12px 16px", borderRadius: 8, cursor: "pointer",
+                background: dark ? "rgba(255,255,255,0.04)" : tier.color + "10",
+                border: `1px solid ${dark ? "rgba(255,255,255,0.1)" : tier.color + "33"}`,
+                borderLeft: `5px solid ${tier.color}`
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: dark ? "#FFFFFF" : tier.color }}>{tierCollapsed ? "▶" : "▼"}</span>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: tier.color }} />
+                  <span style={{ ...lbl, fontSize: 14, color: dark ? "#FFFFFF" : tier.color, letterSpacing: "2px" }}>{tier.label}</span>
+                  <span style={{ fontSize: 11, color: T.textDim, fontWeight: 400 }}>{tier.range}</span>
+                  {overdueInTier > 0 && (
+                    <span style={{
+                      width: 20, height: 20, borderRadius: "50%", background: C.red, color: "#FFF",
+                      fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center"
+                    }}>{overdueInTier}</span>
+                  )}
+                  {needsReviewInTier > 0 && overdueInTier === 0 && (
+                    <span style={{
+                      width: 20, height: 20, borderRadius: "50%", background: C.amber, color: "#FFF",
+                      fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center"
+                    }}>{needsReviewInTier}</span>
+                  )}
+                </div>
+                <span style={{ ...lbl, fontSize: 10, color: T.textDim }}>{tierItems.length} item{tierItems.length !== 1 ? "s" : ""}</span>
+              </div>
+              {/* Tier content */}
+              {!tierCollapsed && (
+                <div style={{ paddingTop: 8 }}>
+                  {tierItems.map(item => renderItemCard(item, tier))}
+                </div>
+              )}
             </div>
           );
-        })}
+        }))}
 
         {/* Promote Selection Modal */}
         {hzPromoteModal && (() => {
@@ -3969,6 +4417,29 @@ update();
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Bulk select action bar — sticky at bottom, only visible when items selected */}
+        {hzSelectMode && hzSelected.size > 0 && (
+          <div style={{
+            position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+            background: T.card, border: `2px solid ${C.red}`,
+            borderRadius: 10, padding: "12px 20px",
+            display: "flex", alignItems: "center", gap: 16,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.4)", zIndex: 300
+          }}>
+            <span style={{ ...lbl, fontSize: 11, color: T.text }}>
+              {hzSelected.size} SELECTED
+            </span>
+            <button onClick={bulkDeleteHzItems} style={{
+              background: C.red, color: "#FFF", border: "none", borderRadius: 6,
+              padding: "8px 20px", cursor: "pointer", ...lbl, fontSize: 10, letterSpacing: "1px"
+            }}>✕ DELETE</button>
+            <button onClick={exitHzSelectMode} style={{
+              background: "transparent", color: T.textMid, border: `1px solid ${T.border}`,
+              borderRadius: 6, padding: "8px 14px", cursor: "pointer", ...lbl, fontSize: 10
+            }}>CANCEL</button>
           </div>
         )}
       </div>
