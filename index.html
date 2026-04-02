@@ -5045,7 +5045,7 @@ update();
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
+// React mounts after successful auth — see showApp()
 </script>
 
 <script>
@@ -5134,6 +5134,9 @@ async function verifyOTP() {
 function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    React.createElement(ErrorBoundary, null, React.createElement(App, null))
+  );
 }
 
 function backToEmail() {
