@@ -4657,7 +4657,9 @@ async function verifyOTP() {
     });
     const data = await res.json();
     if (data.error || !data.access_token) {
-      showMsg('otp-message','Invalid or expired code. Please try again.','error');
+      const isAccessDenied = data.error_description && data.error_description.toLowerCase().includes('not authorised');
+      const msg = isAccessDenied ? 'This code could not be verified. Access to Focus Engine is by invitation only — if you believe you should have access, or would like to enquire about a subscription, please contact us at hello@adhdperformance.uk' : 'Invalid or expired code. Please try again.';
+      showMsg('otp-message', msg, 'error');
       [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
       document.getElementById('d0').focus();
       btn.disabled=false; btn.innerHTML='Verify & Enter →'; return;
