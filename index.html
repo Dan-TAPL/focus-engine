@@ -1,83 +1,57 @@
-<!--
-  ============================================================
-  TAPL Focus Engine
-  © 2026 The ADHD Performance Lab Ltd. All rights reserved.
-  Created: 2 April 2026
-  Fingerprint: TAPL-FE-20260402-ADHDPL-UK
-  ============================================================
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="copyright" content="© 2026 The ADHD Performance Lab Ltd. All rights reserved." />
-  <meta name="application-name" content="TAPL Focus Engine" />
-  <meta name="version" content="MVP7" />
-  <meta name="fingerprint" content="TAPL-FE-20260402-ADHDPL-UK" />
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Focus Engine — TAPL</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #3D2B79; border-radius: 3px; }
-    #auth-screen {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 100vh; padding: 24px; background: #1A1035;
-    }
-    .auth-card {
-      background: #241850; border: 1px solid #3D2B79; border-radius: 16px;
-      padding: 40px 36px; width: 100%; max-width: 420px; text-align: center;
-    }
-    .auth-logo { height: 56px; margin-bottom: 24px; }
-    .auth-title { font-family: 'Montserrat',sans-serif; font-weight: 900; font-size: 22px; color: #FFFFFF; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
-    .auth-subtitle { font-family: 'Montserrat',sans-serif; font-size: 11px; color: #E8453C; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 32px; }
-    .auth-label { font-family: 'Montserrat',sans-serif; font-weight: 900; font-size: 9px; color: #8B80A5; letter-spacing: 1.5px; text-transform: uppercase; text-align: left; margin-bottom: 6px; display: block; }
-    .auth-input { width: 100%; padding: 14px 16px; background: #1E1245; border: 1px solid #3D2B79; border-radius: 8px; color: #FFFFFF; font-family: 'Montserrat',sans-serif; font-size: 14px; outline: none; transition: border 0.15s; margin-bottom: 20px; text-align: center; letter-spacing: 2px; }
-    .auth-input:focus { border-color: #E8453C; }
-    .auth-input::placeholder { color: #6B6080; letter-spacing: 1px; }
-    .auth-btn { width: 100%; padding: 14px; background: #E8453C; border: none; border-radius: 8px; color: #FFFFFF; font-family: 'Montserrat',sans-serif; font-weight: 900; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; margin-bottom: 12px; }
-    .auth-btn:hover { background: #C73830; }
-    .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .auth-btn-secondary { background: transparent; border: 1px solid #3D2B79; color: #8B80A5; width: 100%; padding: 10px; border-radius: 8px; font-family: 'Montserrat',sans-serif; font-weight: 900; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
-    .auth-btn-secondary:hover { border-color: #8B80A5; color: #B8B0CC; }
-    .auth-message { font-family: 'Montserrat',sans-serif; font-size: 11px; margin-top: 16px; padding: 10px 14px; border-radius: 6px; line-height: 1.5; }
-    .auth-message.error { background: rgba(232,69,60,0.12); border: 1px solid rgba(232,69,60,0.3); color: #E8453C; }
-    .auth-message.success { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: #22C55E; }
-    .auth-message.info { background: rgba(8,145,178,0.12); border: 1px solid rgba(8,145,178,0.3); color: #0891B2; }
-    .otp-inputs { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
-    .otp-digit { width: 48px; height: 56px; background: #1E1245; border: 1px solid #3D2B79; border-radius: 8px; color: #FFFFFF; font-family: 'Montserrat',sans-serif; font-weight: 900; font-size: 22px; text-align: center; outline: none; transition: border 0.15s; }
-    .otp-digit:focus { border-color: #E8453C; }
-    .auth-divider { border: none; border-top: 1px solid #3D2B79; margin: 24px 0; }
-    .auth-footer { font-family: 'Montserrat',sans-serif; font-size: 9px; color: #6B6080; letter-spacing: 1px; text-transform: uppercase; margin-top: 24px; }
-    .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #FFFFFF; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #app-container { display: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Engine — TAPL</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Montserrat', sans-serif; overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #3D2B79; border-radius: 3px; }
+
+  #auth-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#1A1035; }
+  #app-container { display:none; }
+  .auth-card { background:#241850; border:1px solid #3D2B79; border-radius:16px; padding:40px 32px; width:100%; max-width:420px; text-align:center; }
+  .auth-logo { font-family:'Montserrat',sans-serif; font-weight:900; font-size:22px; letter-spacing:3px; color:#FFFFFF; text-transform:uppercase; margin-bottom:6px; }
+  .auth-sub { font-family:'Montserrat',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; color:#E8453C; text-transform:uppercase; margin-bottom:32px; }
+  .auth-label { display:block; font-family:'Montserrat',sans-serif; font-size:10px; font-weight:700; letter-spacing:2px; color:#8B80A5; text-transform:uppercase; text-align:left; margin-bottom:8px; }
+  .auth-input { width:100%; background:#1E1245; border:1px solid #3D2B79; border-radius:8px; color:#FFFFFF; font-family:'Montserrat',sans-serif; font-size:14px; padding:12px 16px; outline:none; box-sizing:border-box; margin-bottom:16px; }
+  .auth-input:focus { border-color:#E8453C; }
+  .auth-btn { width:100%; background:#E8453C; border:none; border-radius:8px; color:#FFFFFF; font-family:'Montserrat',sans-serif; font-weight:900; font-size:13px; letter-spacing:2px; text-transform:uppercase; padding:14px; cursor:pointer; margin-bottom:10px; }
+  .auth-btn:hover { background:#c73832; }
+  .auth-btn:disabled { opacity:0.6; cursor:not-allowed; }
+  .auth-btn-secondary { width:100%; background:transparent; border:1px solid #3D2B79; border-radius:8px; color:#8B80A5; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:12px; cursor:pointer; margin-bottom:10px; }
+  .auth-btn-secondary:hover { border-color:#6B5C99; color:#FFFFFF; }
+  .auth-message { border-radius:8px; padding:10px 14px; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:600; margin-top:8px; }
+  .auth-message.error { background:rgba(232,69,60,0.15); color:#E8453C; }
+  .auth-message.info { background:rgba(8,145,178,0.15); color:#0891B2; }
+  .otp-inputs { display:flex; gap:8px; justify-content:center; margin-bottom:20px; }
+  .otp-digit { width:48px; height:56px; background:#1E1245; border:1px solid #3D2B79; border-radius:8px; color:#FFFFFF; font-family:'Montserrat',sans-serif; font-weight:900; font-size:22px; text-align:center; outline:none; }
+  .otp-digit:focus { border-color:#E8453C; }
+  .auth-footer { font-family:'Montserrat',sans-serif; font-size:10px; color:#4A3F6B; margin-top:24px; letter-spacing:1px; }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:8px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
 </head>
 <body>
 
 <div id="auth-screen">
   <div class="auth-card">
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFUAAAA8CAYAAAAXDvbIAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAQxUlEQVR42u1aa5BV1ZX+1j6v+75NN7Q8BW1AQRiJUTRES9GIM0h0Mg4kJM5k1DhJnCI1arQqhUkbR8ckFZ3S+Eqc+EhLiRCTECcTjTXTGvIYUGkfrXQabwMi3U2/7uvce557r/lx74W2A4gtkMzU/ap2dd0+5+yzz7e/vffae67PAWCB2mujjTbaaKONNtpoo4022mijiXb/BQpgZgKgEVFY/S0AiNrlWiMipmtuFok5kQAS" class="auth-logo" alt="TAPL" />
-
     <div id="screen-email">
-      <div class="auth-title">Focus Engine</div>
-      <div class="auth-subtitle">The ADHD Performance Lab</div>
+      <div class="auth-logo">Focus Engine</div>
+      <div class="auth-sub">The ADHD Performance Lab</div>
       <label class="auth-label">Your email address</label>
       <input type="email" id="email-input" class="auth-input" placeholder="you@example.com" autocomplete="email" />
       <button class="auth-btn" id="send-otp-btn" onclick="sendOTP()">Send Access Code →</button>
-      <div id="email-message" class="auth-message" style="display:none;"></div>
+      <div id="email-message" style="display:none;" class="auth-message"></div>
     </div>
-
     <div id="screen-otp" style="display:none;">
-      <div class="auth-title">Check your email</div>
-      <div class="auth-subtitle">Enter your 6-digit code</div>
-      <p style="font-family:Montserrat,sans-serif;font-size:12px;color:#B8B0CC;margin-bottom:24px;line-height:1.6;">
-        We sent a code to <span id="otp-email-display" style="color:#FFFFFF;font-weight:700;"></span>
-      </p>
+      <div class="auth-logo">Check your email</div>
+      <div class="auth-sub">Enter your 6-digit code</div>
+      <p style="font-family:'Montserrat',sans-serif;font-size:13px;color:#8B80A5;margin-bottom:20px;">We sent a code to <span id="otp-email-display" style="color:#FFFFFF;font-weight:700;"></span></p>
       <div class="otp-inputs">
         <input type="text" class="otp-digit" maxlength="1" id="d0" oninput="otpInput(this,0)" onkeydown="otpKeydown(event,0)" inputmode="numeric" />
         <input type="text" class="otp-digit" maxlength="1" id="d1" oninput="otpInput(this,1)" onkeydown="otpKeydown(event,1)" inputmode="numeric" />
@@ -87,31 +61,15 @@
         <input type="text" class="otp-digit" maxlength="1" id="d5" oninput="otpInput(this,5)" onkeydown="otpKeydown(event,5)" inputmode="numeric" />
       </div>
       <button class="auth-btn" id="verify-otp-btn" onclick="verifyOTP()">Verify & Enter →</button>
-      <button class="auth-btn-secondary" onclick="backToEmail()" style="margin-top:8px;">← Use a different email</button>
-      <div id="otp-message" class="auth-message" style="display:none;"></div>
+      <button class="auth-btn-secondary" onclick="backToEmail()">← Use a different email</button>
+      <div id="otp-message" style="display:none;" class="auth-message"></div>
     </div>
-
-    <div id="screen-blocked" style="display:none;">
-      <div class="auth-title">Access Restricted</div>
-      <div class="auth-subtitle">Focus Engine Pro</div>
-      <p style="font-family:Montserrat,sans-serif;font-size:13px;color:#B8B0CC;margin-bottom:24px;line-height:1.7;">
-        This email address doesn't have access to Focus Engine Pro yet.
-      </p>
-      <p style="font-family:Montserrat,sans-serif;font-size:12px;color:#6B6080;margin-bottom:28px;line-height:1.6;">
-        If you believe this is an error, or you'd like to request access, get in touch.
-      </p>
-      <a href="mailto:hello@adhdperformance.uk" class="auth-btn" style="display:block;text-decoration:none;padding:14px;">
-        Request Access
-      </a>
-      <button class="auth-btn-secondary" onclick="backToEmail()" style="margin-top:8px;">← Try a different email</button>
-    </div>
-
-    <hr class="auth-divider" />
-    <div class="auth-footer">© 2026 The ADHD Performance Lab Ltd</div>
+    <div class="auth-footer">© 2026 THE ADHD PERFORMANCE LAB LTD</div>
   </div>
 </div>
 
-<div id="app-container"><div id="root"></div>
+<div id="app-container">
+<div id="root"></div>
 
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -119,7 +77,636 @@
 
 <!-- TAPL Modules (bundled) -->
 <script>
-const a0_0x4a46bb=a0_0x3e58;(function(_0x4a2e0b,_0x4c4274){const _0x4e24c1=a0_0x3e58,_0x391667=_0x4a2e0b();while(!![]){try{const _0x53db5d=-parseInt(_0x4e24c1(0x260))/0x1+parseInt(_0x4e24c1(0x228))/0x2+-parseInt(_0x4e24c1(0x1ea))/0x3+-parseInt(_0x4e24c1(0x1f7))/0x4*(-parseInt(_0x4e24c1(0x202))/0x5)+parseInt(_0x4e24c1(0x297))/0x6+parseInt(_0x4e24c1(0x24c))/0x7*(-parseInt(_0x4e24c1(0x1db))/0x8)+parseInt(_0x4e24c1(0x1f9))/0x9;if(_0x53db5d===_0x4c4274)break;else _0x391667['push'](_0x391667['shift']());}catch(_0xde318){_0x391667['push'](_0x391667['shift']());}}}(a0_0x9577,0x9b7aa));const C={'purple':a0_0x4a46bb(0x1f3),'purpleLight':a0_0x4a46bb(0x239),'red':a0_0x4a46bb(0x1fe),'redDark':a0_0x4a46bb(0x210),'green':a0_0x4a46bb(0x1f8),'greenDark':a0_0x4a46bb(0x1d5),'amber':a0_0x4a46bb(0x1d8),'teal':a0_0x4a46bb(0x26b),'darkBg':a0_0x4a46bb(0x21e),'darkCard':a0_0x4a46bb(0x279),'darkBorder':a0_0x4a46bb(0x239),'lightBg':a0_0x4a46bb(0x1e1),'lightCard':a0_0x4a46bb(0x214),'lightBorder':a0_0x4a46bb(0x24f)},__TAPL__=Object[a0_0x4a46bb(0x213)]({'product':a0_0x4a46bb(0x1dc),'version':a0_0x4a46bb(0x296),'owner':a0_0x4a46bb(0x1d7),'copyright':a0_0x4a46bb(0x292),'created':a0_0x4a46bb(0x1f2),'fingerprint':a0_0x4a46bb(0x26a),'contact':a0_0x4a46bb(0x1eb),'verify':function(){const _0x598569=a0_0x4a46bb;return btoa(this[_0x598569(0x211)]+this[_0x598569(0x27f)]+this[_0x598569(0x20e)]);}}),darkTheme={'bg':C[a0_0x4a46bb(0x1ec)],'card':C[a0_0x4a46bb(0x20d)],'border':C[a0_0x4a46bb(0x23e)],'text':a0_0x4a46bb(0x214),'textMid':'#B8B0CC','textDim':a0_0x4a46bb(0x20f),'textFaint':a0_0x4a46bb(0x244),'header':C[a0_0x4a46bb(0x28f)],'inputBg':a0_0x4a46bb(0x215),'inputBorder':a0_0x4a46bb(0x239),'rowHover':a0_0x4a46bb(0x24d),'shadow':a0_0x4a46bb(0x23d)},lightTheme={'bg':C[a0_0x4a46bb(0x263)],'card':C[a0_0x4a46bb(0x1f0)],'border':C['lightBorder'],'text':a0_0x4a46bb(0x21e),'textMid':a0_0x4a46bb(0x244),'textDim':a0_0x4a46bb(0x20f),'textFaint':a0_0x4a46bb(0x234),'header':C[a0_0x4a46bb(0x28f)],'inputBg':a0_0x4a46bb(0x214),'inputBorder':a0_0x4a46bb(0x24f),'rowHover':'rgba(45,27,105,0.08)','shadow':'0\x202px\x208px\x20rgba(0,0,0,0.08)'},QUADRANTS=[{'id':a0_0x4a46bb(0x26e),'label':'DO','desc':a0_0x4a46bb(0x1e3),'short':'DO','color':a0_0x4a46bb(0x1f8),'bg':'rgba(34,197,94,0.15)'},{'id':'important_not_urgent','label':a0_0x4a46bb(0x29d),'desc':a0_0x4a46bb(0x29a),'short':a0_0x4a46bb(0x29d),'color':a0_0x4a46bb(0x1d8),'bg':a0_0x4a46bb(0x241)},{'id':'not_important_urgent','label':a0_0x4a46bb(0x29c),'desc':a0_0x4a46bb(0x231),'short':a0_0x4a46bb(0x29c),'color':a0_0x4a46bb(0x1fe),'bg':'rgba(232,69,60,0.15)'},{'id':a0_0x4a46bb(0x28e),'label':a0_0x4a46bb(0x267),'desc':a0_0x4a46bb(0x1ff),'short':'DROP','color':'#6B6080','bg':a0_0x4a46bb(0x266)}],QUAD_BUTTONS=[{'id':a0_0x4a46bb(0x26e),'code':'HH','label':'DO'},{'id':a0_0x4a46bb(0x217),'code':'HL','label':a0_0x4a46bb(0x29d)},{'id':a0_0x4a46bb(0x258),'code':'LH','label':a0_0x4a46bb(0x29c)},{'id':'not_important_not_urgent','code':'LL','label':a0_0x4a46bb(0x267)}],TIME_BUCKETS=[{'id':'5','label':a0_0x4a46bb(0x1fa),'max':0x5,'color':a0_0x4a46bb(0x1f8)},{'id':'30','label':'UP\x20TO\x2030\x20MINS','max':0x1e,'color':a0_0x4a46bb(0x26b)},{'id':'60','label':a0_0x4a46bb(0x203),'max':0x3c,'color':'#F59E0B'},{'id':a0_0x4a46bb(0x291),'label':a0_0x4a46bb(0x268),'max':Infinity,'color':a0_0x4a46bb(0x1fe)}],lbl={'fontFamily':a0_0x4a46bb(0x20c),'fontWeight':0x384,'textTransform':'uppercase','letterSpacing':a0_0x4a46bb(0x248)},RADAR={'close':{'label':a0_0x4a46bb(0x23b),'color':C[a0_0x4a46bb(0x27b)],'bg':a0_0x4a46bb(0x1f4),'desc':a0_0x4a46bb(0x25b)},'mid':{'label':a0_0x4a46bb(0x236),'color':C[a0_0x4a46bb(0x283)],'bg':'rgba(245,158,11,0.12)','desc':a0_0x4a46bb(0x1d2)},'long':{'label':a0_0x4a46bb(0x289),'color':C['teal'],'bg':a0_0x4a46bb(0x1da),'desc':'On\x20the\x20horizon,\x20not\x20yet\x20urgent'},'someday':{'label':a0_0x4a46bb(0x201),'color':C[a0_0x4a46bb(0x249)],'bg':'rgba(34,197,94,0.12)','desc':a0_0x4a46bb(0x24e)}};function loadData(_0xbedb9,_0x4873b7){const _0x509de3=a0_0x4a46bb;try{const _0x41a4ac=localStorage['getItem'](_0xbedb9);return _0x41a4ac?JSON[_0x509de3(0x200)](_0x41a4ac):_0x4873b7;}catch(_0x523536){return _0x4873b7;}}function saveData(_0x58df4c,_0xbf31af){const _0x193d1c=a0_0x4a46bb;try{localStorage[_0x193d1c(0x284)](_0x58df4c,JSON['stringify'](_0xbf31af));}catch(_0x4622a2){console[_0x193d1c(0x245)](_0x193d1c(0x1d3),_0x4622a2);}}const AudioEngine=(function(){let _0x2fd6ab=null;function _0x3a81ae(){const _0xec9b96=a0_0x3e58;if(!_0x2fd6ab)_0x2fd6ab=new(window['AudioContext']||window[(_0xec9b96(0x28a))])();return _0x2fd6ab;}function _0x22bcad(_0x11e133,_0x3fd62f,_0x20a55f){const _0x175182=a0_0x3e58;try{const _0x5c13de=_0x3a81ae(),_0x463769=_0x5c13de[_0x175182(0x1f1)](),_0x525671=_0x5c13de['createGain']();_0x463769[_0x175182(0x21f)]=_0x20a55f||'sine',_0x463769['frequency'][_0x175182(0x229)]=_0x11e133,_0x525671[_0x175182(0x29b)]['setValueAtTime'](0.3,_0x5c13de['currentTime']),_0x525671[_0x175182(0x29b)]['exponentialRampToValueAtTime'](0.01,_0x5c13de[_0x175182(0x20a)]+_0x3fd62f),_0x463769[_0x175182(0x28b)](_0x525671),_0x525671[_0x175182(0x28b)](_0x5c13de[_0x175182(0x1e0)]),_0x463769[_0x175182(0x250)](),_0x463769[_0x175182(0x286)](_0x5c13de[_0x175182(0x20a)]+_0x3fd62f);}catch(_0x496919){}}function _0x4359d2(){const _0x3c6e3c=a0_0x3e58;_0x22bcad(0x370,0.15,_0x3c6e3c(0x22d));}function _0xabc47f(){const _0x5d3a22=a0_0x3e58;_0x22bcad(0x4b0,0.3,_0x5d3a22(0x22d));}function _0x591ae9(){[0x0,0x96,0x12c]['forEach']((_0x4548ec,_0x124d50)=>{const _0x2afd72=a0_0x3e58;setTimeout(()=>_0x22bcad(0x294+_0x124d50*0xdc,0.25,_0x2afd72(0x22d)),_0x4548ec);});}function _0x3f2ab9(){const _0x31f142=a0_0x3e58;_0x22bcad(0x370,0.12,'triangle'),setTimeout(()=>_0x22bcad(0x44c,0.15,_0x31f142(0x221)),0x64);}function _0x220388(){[0x0,0xc8,0x190,0x258]['forEach']((_0x3405df,_0x18c524)=>{const _0x3b5b8c=a0_0x3e58;setTimeout(()=>_0x22bcad(0x20b+_0x18c524*0x83,0.35,_0x3b5b8c(0x22d)),_0x3405df);});}function _0x10dcc5(){const _0x4c7e30=a0_0x3e58;_0x22bcad(0x1b8,0.3,_0x4c7e30(0x22d)),setTimeout(()=>_0x22bcad(0x226,0.3,_0x4c7e30(0x22d)),0xc8);}return{'playCountdownBeep':_0x4359d2,'playGoBeep':_0xabc47f,'playBlockComplete':_0x591ae9,'playTaskComplete':_0x3f2ab9,'playSessionComplete':_0x220388,'playBreakStart':_0x10dcc5};}());function sortTasks(_0x114893,_0x8199fe,_0x815d49){const _0x461ff2=a0_0x4a46bb,_0x27417c=[..._0x114893];switch(_0x8199fe){case _0x461ff2(0x204):return _0x27417c[_0x461ff2(0x287)]((_0x120a7b,_0x48d486)=>(parseInt(_0x120a7b[_0x461ff2(0x265)])||0x0)-(parseInt(_0x48d486[_0x461ff2(0x265)])||0x0));case _0x461ff2(0x255):return _0x27417c['sort']((_0x300243,_0x1cf447)=>(parseInt(_0x1cf447[_0x461ff2(0x265)])||0x0)-(parseInt(_0x300243[_0x461ff2(0x265)])||0x0));case _0x461ff2(0x222):const _0x4cfc79=[_0x461ff2(0x26e),_0x461ff2(0x258),_0x461ff2(0x217),_0x461ff2(0x28e)];return _0x27417c[_0x461ff2(0x287)]((_0x5222a5,_0x1f6b79)=>_0x4cfc79[_0x461ff2(0x253)](_0x5222a5[_0x461ff2(0x237)])-_0x4cfc79[_0x461ff2(0x253)](_0x1f6b79[_0x461ff2(0x237)]));default:return _0x27417c[_0x461ff2(0x287)]((_0x42abc0,_0x53fd84)=>_0x815d49['indexOf'](_0x42abc0)-_0x815d49[_0x461ff2(0x253)](_0x53fd84));}}function blockTotal(_0x58e170,_0x1ab519){const _0x31cebb=a0_0x4a46bb;if(!_0x58e170['taskIds'])return 0x0;return _0x58e170[_0x31cebb(0x1e4)]['reduce']((_0x10971c,_0x36c7a5)=>{const _0x328fe2=_0x31cebb,_0x5bc1ab=_0x1ab519[_0x328fe2(0x21d)](_0x5d898d=>_0x5d898d['id']===_0x36c7a5);return _0x10971c+(_0x5bc1ab?parseInt(_0x5bc1ab[_0x328fe2(0x265)])||0x0:0x0);},0x0);}function calcSessionWindow(_0x2f0d4a,_0xe45320){const _0x350064=a0_0x4a46bb,[_0x148705,_0xad4d44]=_0x2f0d4a['split'](':')['map'](Number),[_0x713886,_0x15065e]=_0xe45320[_0x350064(0x294)](':')[_0x350064(0x271)](Number);let _0x87d68=_0x148705*0x3c+_0xad4d44,_0x96b98f=_0x713886*0x3c+_0x15065e;if(_0x96b98f<=_0x87d68)_0x96b98f+=0x18*0x3c;return _0x96b98f-_0x87d68;}function calcUsedTime(_0x5013d6,_0x4ba186){return _0x5013d6['reduce']((_0x4af0da,_0x28c15b)=>{const _0x1cf5a7=a0_0x3e58;return _0x4af0da+blockTotal(_0x28c15b,_0x4ba186)+(_0x28c15b[_0x1cf5a7(0x262)]||0x0);},0x0);}function getAvailableTasks(_0x51bbdf,_0x2ec892){const _0x4da6a8=a0_0x4a46bb,_0x18bbed=new Set();return _0x2ec892[_0x4da6a8(0x29e)](_0x58dfc5=>(_0x58dfc5[_0x4da6a8(0x1e4)]||[])['forEach'](_0x5e5fce=>_0x18bbed[_0x4da6a8(0x28d)](_0x5e5fce))),_0x51bbdf[_0x4da6a8(0x26c)](_0x497117=>!_0x18bbed['has'](_0x497117['id']));}function createBlock(_0x9142db){return{'id':'block_'+Date['now']()+'_'+_0x9142db,'taskIds':[],'maxMins':0x28,'breakMins':0xa,'deferred':![]};}function a0_0x9577(){const _0x25e845=['zgvZDgLUyxrPB24','i0yZrJbgrG','uhjVBw90zwq','sgLNAcbjBxbVCNrHBMnLic8GsgLNAcbvCMDLBMn5','DgfZA0LKCW','rM9JDxmGrw5NAw5LifnLC3nPB24','zhvYyxrPB25nAw5Z','qwn0AxzL','ookaKZiXigrHExm','y3jLyxrLrwXLBwvUDa','mJCWnJa0nvDitNfYqG','AgvSBg9aDgHLywrOzhbLCMzVCM1HBMnLBgfIlMnVBq','zgfYA0jN','nJaRigrHExm','qgzVy3vZzw5NAw5L','BgfZDfjLDMLLD2vK','BgLNAhrdyxjK','y3jLyxrLt3nJAwXSyxrVCG','mJaYnI0Wnc0WmG','iZjemui2oq','CMDIysGYmZiSnJKSnJaSmc4XmIK','yxbWzw5Kq2HPBgq','BM93','mtaXmZy0C21et2jk','iZiYqZu1rq','mtmXndu1mJzlsxvVr2m','vvaGve8Gnsbnsu5t','mJlIGjm2mcbKyxLZ','y3jLyxrLt2jQzwn0vvjm','Dgv4Da','i0u4nduZqW','tg93ieLTCg9YDgfUy2uGlYbmB3CGvxjNzw5JEq','CgfYC2u','u09nrurbwsdIGjqGnJaRierbwvm','mJvvzhHfCKe','vvaGve8GnJaGtuLouW','DgLTzv9HC2m','zgfPBhK','CMvWzwf0','zMXVB3i','BMfTzq','Dg9tDhjPBMC','y3vYCMvUDfrPBwu','Dg9ju09tDhjPBMC','j01VBNrZzxjYyxqNlcbZyw5ZlxnLCMLM','zgfYA0nHCMq','B3DUzxi','iZHcodbbnq','i0m3mZGZma','zMLUz2vYChjPBNq','q2H1BMTZierVBMu','zNjLzxPL','i0zgrKzgrG','iZffmti0nq','tgf1BMnO','Aw1WB3j0yw50x25VDf91CMDLBNq','BgfZDenVBxbSzxrLzef0','CMvTB3zLq2HPBgq','u09nrurbwq','BgvUz3rO','rhvLierHDgu','zMLUza','iZfbmtaZnq','DhLWzq','vgfZAW','DhjPyw5NBgu','ChjPB3jPDhK','y29TCgXLDgvK','tMfTzq','rgf0zsbtDgf0Dxm','ru5eoLzdquXftKrbuG','y2H1BMTZ','mJa1mtmXogTZDfrZvW','DMfSDwu','CM91BMq','nYbKyxLZig9YigXLC3m','rg9Uzq','C2LUzq','tM90AwzPy2f0Aw9U','u3rHDhvZ','y2XPy2S','tg93ieLTCg9YDgfUy2uGlYbiAwDOifvYz2vUy3K','DgfWBc0','Bg9UzW','i0i4qJbdqW','u291CMnLifbYB2PLy3q','u09ptIdIGjqGookaKZiXierbwvm','CxvHzhjHBNq','zM9JDxmTzw5NAw5LlxnLC3nPB24Uy3n2','iZnemKi3oq','u1vntufswtO','tK9xiokaLcdIIAq3ierbwvm','DgfWBc1MB2n1CY1LBMDPBMu','mcaYChGGohb4ihjNyMeOmcWWldaSmc4Zkq','zgfYA0jVCMrLCG','qKvhsu46vKnbtevorefscLzfuLnjt046mI4WcLbst0rjrdOTlY9uqvbmlY9gB2n1CYbfBMDPBMuVl0vocKnbtfndquXfoKDsruDpuKLbtGO','u09ptG','CMDIysGYnduSmtu4ldeXldaUmtuP','u2L6zq','vhLWzq','iZzcnJa4ma','zxjYB3i','CMfUzg9T','zg9Uzq','ms41ChG','z3jLzw4','y2H1BMS','Dgv4Dc9JywXLBMrHCJTJAgfYC2v0pxv0zI04','odu5mJvdAM5UthG','CMDIysG0nsWYnYWXmduSmc4Zkq','rMfYig91DcWGANvZDcbRzwvWAw5NihrYywnR','i0uYrergma','C3rHCNq','u291CMnL','CgvYBwLZC2LVBG','Aw5KzxHpzG','y2XVC2u','DgLTzv9KzxnJ','CMvXDwvZDfbLCM1PC3nPB24','C2XPy2u','BM90x2LTCg9YDgfUDf91CMDLBNq','q2H1BMTZifrVDgfS','BwvKAxvT','tMvLzhmGyxr0zw50Aw9UihrOAxmGD2vLAW','C29TzwrHEq','DgfWBc1OB3jPEM9U','q29TCgXLDgvK','q29UzMLYBwvK','mte4nda5nKTwwNjWzW','AhjLzG','yNjLywTnAw5Z','BgLNAhrczW','z2v0vgLTzq','BwLUDxrLCW','CMDIysGXmdCSotySmti4ldaUmtuP','rfjpua','nJaRie1jtLm','ChjVBw90zwq','vefqtc1grs0Ymdi2mdqWmI1breHeueWTvuS','iZa4otfcmG','zMLSDgvY','revtq1jjufrjt046','Aw1WB3j0yw50x3vYz2vUDa','ChjVAMvJDa','ChjVBw90zwrgCM9T','BwfW','C3rHCNreyxrL','DgfZAW','C2v0sg91CNm','CMvWBgfJzq','CgfKu3rHCNq','tK9x','CMvKDwnL','iZi0mtG1ma','zgvZy3jPChrPB24','CMvK','yM9KEq','sg9YAxPVBG','Bw9UDgHSEq','y3jLyxrLza','zM9JDxmTzw5NAw5Llwz1BgWTzxHWB3j0lq','AM9PBG','zg93BMXVywq','yw1Izxi','C2v0sxrLBq','DhjPBq','C3rVCa','C29YDa','zgvMzxjYzwq','tefurviG4OcuidiY4OctnJaGrefzuW','D2vIA2L0qxvKAw9dB250zxH0','y29UBMvJDa','BM9Uzq','ywrK','BM90x2LTCg9YDgfUDf9UB3rFDxjNzw50','ChvYCgXL','ChvZAa','nJaR','WQKGmJaYnIbuAguGqurircbqzxjMB3jTyw5JzsbmywiGthrKlIbbBgWGCMLNAhrZihjLC2vYDMvKlG','zgf0zunVBMzPCM1Lza','C3bSAxq','rfrftKq6','tvzqnW','mtC2ndyWmffmtgPJuG','zgvMyxvSDa','C3vIC3rY','sgLNAcbjBxbVCNrHBMnLic8Gtg93ifvYz2vUy3K','z2fPBG','uKvbq1q','ueXbtG','zM9YrwfJAa','CMv2B2TLt2jQzwn0vvjm','C2L6zq','q29TAw5NihvWigLUidiTmYb3zwvRCW','u2f2zsbMywLSzwq6','Dgv4Dc9JC3y7y2HHCNnLDd11DgyToa','iZffqtm0rq','D2vLA2X5','vgHLiefeseqGugvYzM9YBwfUy2uGtgfIieX0za','i0y1ouuWqG','twLUDxrLCW','CMDIysG4lde0nsWXnZGSmc4XmIK','mtiWyxDmBwnH','vefqtcbgB2n1CYbfBMDPBMu','rfrtvefsvdO','zhvLrgf0zq','uxvHzhjHBNq'];a0_0x9577=function(){return _0x25e845;};return a0_0x9577();}function defaultBlocks(){return[createBlock(0x1),createBlock(0x2),createBlock(0x3)];}function formatTime(_0x16738b){const _0xb1921a=a0_0x4a46bb;if(_0x16738b<0x0)_0x16738b=0x0;const _0x584bb6=Math[_0xb1921a(0x207)](_0x16738b/0x3c),_0x52e21f=_0x16738b%0x3c;return String(_0x584bb6)[_0xb1921a(0x276)](0x2,'0')+':'+String(_0x52e21f)[_0xb1921a(0x276)](0x2,'0');}function getRunnableBlocks(_0xb6d388){const _0x5db45c=a0_0x4a46bb;return _0xb6d388[_0x5db45c(0x26c)](_0x138f6d=>!_0x138f6d[_0x5db45c(0x288)]&&_0x138f6d[_0x5db45c(0x1e4)]&&_0x138f6d['taskIds']['length']>0x0);}function getBlockTasks(_0x449b0e,_0x5809ae){const _0x14e4d2=a0_0x4a46bb;return _0x449b0e[_0x14e4d2(0x1e4)][_0x14e4d2(0x271)](_0x24f7bf=>_0x5809ae[_0x14e4d2(0x21d)](_0x56f804=>_0x56f804['id']===_0x24f7bf))[_0x14e4d2(0x26c)](Boolean);}function blockWorkSeconds(_0x3bd8ef,_0x130cf2){const _0x2730a1=a0_0x4a46bb;return _0x3bd8ef[_0x2730a1(0x1e4)][_0x2730a1(0x278)]((_0x3cb143,_0x4afaad)=>{const _0x313be5=_0x2730a1,_0x3187cb=_0x130cf2[_0x313be5(0x21d)](_0x1fb816=>_0x1fb816['id']===_0x4afaad);return _0x3cb143+(_0x3187cb?(parseInt(_0x3187cb['minutes'])||0x0)*0x3c:0x0);},0x0);}function taskDeadline(_0x129c86,_0x5a1552,_0xf966ed){const _0x53f7a4=a0_0x4a46bb;let _0x43c860=0x0;for(const _0x21f4b6 of _0x129c86['taskIds']){const _0x53ad8e=_0xf966ed[_0x53f7a4(0x21d)](_0x172df3=>_0x172df3['id']===_0x21f4b6);_0x43c860+=_0x53ad8e?(parseInt(_0x53ad8e[_0x53f7a4(0x265)])||0x0)*0x3c:0x0;if(_0x21f4b6===_0x5a1552)return _0x43c860;}return _0x43c860;}function taskStartTime(_0x2bc368,_0x9314e8,_0x9a3dfc){const _0x2021b3=a0_0x4a46bb;let _0x291073=0x0;for(const _0x157c1a of _0x2bc368[_0x2021b3(0x1e4)]){if(_0x157c1a===_0x9314e8)return _0x291073;const _0x4a149e=_0x9a3dfc['find'](_0x549a0f=>_0x549a0f['id']===_0x157c1a);_0x291073+=_0x4a149e?(parseInt(_0x4a149e[_0x2021b3(0x265)])||0x0)*0x3c:0x0;}return _0x291073;}function getCurrentTask(_0x2a97cb,_0x2cca33,_0x2ae74a,_0x3431dc,_0x521131){const _0x1a7718=a0_0x4a46bb;let _0x532405=0x0;for(const _0x4456f3 of _0x2a97cb[_0x1a7718(0x1e4)]){const _0x4e273f=_0x2ae74a[_0x1a7718(0x21d)](_0x5b5195=>_0x5b5195['id']===_0x4456f3);if(!_0x4e273f)continue;const _0x4ce0a8=(parseInt(_0x4e273f[_0x1a7718(0x265)])||0x0)*0x3c;_0x532405+=_0x4ce0a8;if(_0x3431dc['has'](_0x4456f3)||_0x521131['has'](_0x4456f3))continue;if(_0x4ce0a8===0x0)return{'task':_0x4e273f,'remaining':0x0,'total':0x0};const _0x46833a=_0x532405-_0x2cca33;if(_0x46833a>0x0)return{'task':_0x4e273f,'remaining':_0x46833a,'total':_0x4ce0a8};}return null;}function daysUntil(_0x345d2c){const _0x1f509a=a0_0x4a46bb;if(!_0x345d2c)return Infinity;const _0x40ed6b=new Date();_0x40ed6b[_0x1f509a(0x274)](0x0,0x0,0x0,0x0);const _0x586205=new Date(_0x345d2c);return _0x586205[_0x1f509a(0x274)](0x0,0x0,0x0,0x0),Math['ceil']((_0x586205-_0x40ed6b)/(0x3e8*0x3c*0x3c*0x18));}function getRadarTier(_0x33c022){const _0x3afb0d=a0_0x4a46bb,_0x34e4f0=daysUntil(_0x33c022);if(_0x34e4f0<=0x7)return _0x3afb0d(0x254);if(_0x34e4f0<=0x15)return'mid';if(_0x34e4f0<=0x3c)return _0x3afb0d(0x233);return _0x3afb0d(0x25c);}function a0_0x3e58(_0x13c771,_0x36c37f){_0x13c771=_0x13c771-0x1d1;const _0x957704=a0_0x9577();let _0x3e5843=_0x957704[_0x13c771];if(a0_0x3e58['LuGkKI']===undefined){var _0x4e30e4=function(_0x1553fb){const _0x39b415='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';let _0xbedb9='',_0x4873b7='';for(let _0x41a4ac=0x0,_0x523536,_0x58df4c,_0xbf31af=0x0;_0x58df4c=_0x1553fb['charAt'](_0xbf31af++);~_0x58df4c&&(_0x523536=_0x41a4ac%0x4?_0x523536*0x40+_0x58df4c:_0x58df4c,_0x41a4ac++%0x4)?_0xbedb9+=String['fromCharCode'](0xff&_0x523536>>(-0x2*_0x41a4ac&0x6)):0x0){_0x58df4c=_0x39b415['indexOf'](_0x58df4c);}for(let _0x4622a2=0x0,_0x2fd6ab=_0xbedb9['length'];_0x4622a2<_0x2fd6ab;_0x4622a2++){_0x4873b7+='%'+('00'+_0xbedb9['charCodeAt'](_0x4622a2)['toString'](0x10))['slice'](-0x2);}return decodeURIComponent(_0x4873b7);};a0_0x3e58['TaOKQV']=_0x4e30e4,a0_0x3e58['BataVY']={},a0_0x3e58['LuGkKI']=!![];}const _0x5a3087=_0x957704[0x0],_0x4dbc61=_0x13c771+_0x5a3087,_0x26aa20=a0_0x3e58['BataVY'][_0x4dbc61];return!_0x26aa20?(_0x3e5843=a0_0x3e58['TaOKQV'](_0x3e5843),a0_0x3e58['BataVY'][_0x4dbc61]=_0x3e5843):_0x3e5843=_0x26aa20,_0x3e5843;}const TIER_DISPLAY={'close':{'label':a0_0x4a46bb(0x277),'range':a0_0x4a46bb(0x22b),'color':a0_0x4a46bb(0x1fe)},'mid':{'label':a0_0x4a46bb(0x240),'range':a0_0x4a46bb(0x1e8),'color':a0_0x4a46bb(0x1d8)},'long':{'label':'LATER','range':a0_0x4a46bb(0x1fb),'color':a0_0x4a46bb(0x26b)},'someday':{'label':a0_0x4a46bb(0x21a),'range':a0_0x4a46bb(0x1ed),'color':'#22C55E'}};function createHorizonItem(_0x3d489b,_0x4f26a1,_0x1671b9){const _0x3397f4=a0_0x4a46bb;return{'id':'hz_'+Date[_0x3397f4(0x1f6)]()+'_'+Math[_0x3397f4(0x246)]()[_0x3397f4(0x209)](0x24)[_0x3397f4(0x299)](0x2,0x5),'type':_0x3d489b,'name':_0x4f26a1,'dueDate':_0x1671b9||'','triggerDate':'','chunks':[],'completed':![],'repeat':'none','pulseFreq':_0x3397f4(0x25a),'autoRefresh':!![],'lastCompletedAt':null,'needsRefreshPrompt':![],'createdAt':new Date()[_0x3397f4(0x20b)](),'lastReviewed':new Date()[_0x3397f4(0x20b)]()};}function shouldResetRepeat(_0xfc5a2f){const _0x3dcc06=a0_0x4a46bb;if(!_0xfc5a2f[_0x3dcc06(0x206)]||_0xfc5a2f[_0x3dcc06(0x206)]===_0x3dcc06(0x28c)||!_0xfc5a2f[_0x3dcc06(0x218)])return![];const _0x2f3d24=new Date();_0x2f3d24[_0x3dcc06(0x274)](0x0,0x0,0x0,0x0);const _0x55e02d=new Date(_0xfc5a2f[_0x3dcc06(0x218)]);_0x55e02d[_0x3dcc06(0x274)](0x0,0x0,0x0,0x0);const _0x5ed73f=Math['floor']((_0x2f3d24-_0x55e02d)/(0x3e8*0x3c*0x3c*0x18));if(_0xfc5a2f['repeat']===_0x3dcc06(0x205)&&_0x5ed73f>=0x1)return!![];if(_0xfc5a2f['repeat']===_0x3dcc06(0x1d6)&&_0x5ed73f>=0x7)return!![];if(_0xfc5a2f[_0x3dcc06(0x206)]===_0x3dcc06(0x27e)&&_0x5ed73f>=0x1e)return!![];return![];}function resetRepeatItem(_0x142838){const _0x4f0efb=a0_0x4a46bb,_0x5bc61e={..._0x142838,'completed':![],'lastReviewed':new Date()[_0x4f0efb(0x20b)]()};return _0x5bc61e[_0x4f0efb(0x227)]&&_0x5bc61e[_0x4f0efb(0x227)]['length']>0x0&&(_0x5bc61e[_0x4f0efb(0x227)]=_0x5bc61e[_0x4f0efb(0x227)][_0x4f0efb(0x271)](_0xc4e262=>({..._0xc4e262,'done':![]}))),_0x5bc61e;}const REVIEW_CADENCE={'close':0x1,'mid':0x3,'long':0x7,'someday':0xe},PULSE_FREQ={'high':0.5,'medium':0x1,'low':0x2};function getEffectiveCadence(_0x4e11c5){const _0x3290fe=a0_0x4a46bb,_0x17a020=getRadarTier(_0x4e11c5[_0x3290fe(0x1de)]),_0x8a3f60=REVIEW_CADENCE[_0x17a020],_0x123395=PULSE_FREQ[_0x4e11c5['pulseFreq']||_0x3290fe(0x25a)]||0x1;return Math['max'](0x1,Math[_0x3290fe(0x22a)](_0x8a3f60*_0x123395));}function daysSinceReview(_0x3de5bd){const _0x519a3d=a0_0x4a46bb;if(!_0x3de5bd[_0x519a3d(0x1ef)])return Infinity;const _0x3bf611=new Date();_0x3bf611[_0x519a3d(0x274)](0x0,0x0,0x0,0x0);const _0x53c14a=new Date(_0x3de5bd[_0x519a3d(0x1ef)]);return _0x53c14a[_0x519a3d(0x274)](0x0,0x0,0x0,0x0),Math[_0x519a3d(0x207)]((_0x3bf611-_0x53c14a)/(0x3e8*0x3c*0x3c*0x18));}function isOverdueForReview(_0x46cd11){const _0x4ad7e5=getEffectiveCadence(_0x46cd11);return daysSinceReview(_0x46cd11)>=_0x4ad7e5;}function getEscalationLevel(_0x1e910f){const _0x2e25e0=getEffectiveCadence(_0x1e910f),_0xfff269=daysSinceReview(_0x1e910f);if(_0xfff269<_0x2e25e0)return 0x0;if(_0xfff269<_0x2e25e0*0x2)return 0x1;return 0x2;}function isPastDue(_0x110d02){const _0x43469f=a0_0x4a46bb;if(!_0x110d02['dueDate'])return![];return daysUntil(_0x110d02[_0x43469f(0x1de)])<0x0;}function createProjectFromTasks(_0x271d57,_0x8f7cc2,_0x5bc8a7){const _0x16343e=a0_0x4a46bb,_0x4b129f=createHorizonItem('project',_0x271d57,_0x5bc8a7);return _0x4b129f['chunks']=_0x8f7cc2[_0x16343e(0x271)]((_0x88c891,_0x5d4ae8)=>({'id':'chunk_'+Date['now']()+'_'+_0x5d4ae8,'name':_0x88c891,'done':![]})),_0x4b129f;}function getPromotableTasks(_0x3448aa){const _0x2371dc=a0_0x4a46bb;if(_0x3448aa[_0x2371dc(0x21f)]===_0x2371dc(0x273))return[{'text':_0x3448aa[_0x2371dc(0x208)],'minutes':''}];return _0x3448aa['chunks']['filter'](_0x5ba76e=>!_0x5ba76e[_0x2371dc(0x247)])[_0x2371dc(0x271)](_0x54f3a2=>({'text':_0x54f3a2[_0x2371dc(0x208)],'minutes':''}));}function loadHorizon(){const _0x42c7df=a0_0x4a46bb;return loadData(_0x42c7df(0x25d),[]);}function saveHorizon(_0x2ef40c){const _0x416d5c=a0_0x4a46bb;saveData(_0x416d5c(0x25d),_0x2ef40c);}function generateICS(_0x3a7b78){const _0x431245=a0_0x4a46bb;let _0x2f52fe=_0x431245(0x23f);return _0x3a7b78['forEach'](_0x1c4b40=>{const _0x3dc4b8=_0x431245,_0x1567a3=new Date(_0x1c4b40[_0x3dc4b8(0x272)]),_0x4b458b=new Date(_0x1567a3[_0x3dc4b8(0x264)]()+_0x1c4b40[_0x3dc4b8(0x1e6)]*0xea60),_0x4c102d=_0x26f7b6=>_0x26f7b6[_0x3dc4b8(0x20b)]()[_0x3dc4b8(0x275)](/[-:]/g,'')[_0x3dc4b8(0x275)](/\.\d{3}/,''),_0x7329c1=_0x3dc4b8(0x232)+Date[_0x3dc4b8(0x1f6)]()+'-'+Math[_0x3dc4b8(0x246)]()['toString'](0x24)['substr'](0x2,0x8)+_0x3dc4b8(0x1ee);_0x2f52fe+='BEGIN:VEVENT\x0a',_0x2f52fe+='UID:'+_0x7329c1+'\x0a',_0x2f52fe+=_0x3dc4b8(0x1dd)+_0x4c102d(_0x1567a3)+'\x0a',_0x2f52fe+=_0x3dc4b8(0x295)+_0x4c102d(_0x4b458b)+'\x0a',_0x2f52fe+=_0x3dc4b8(0x23a)+(_0x1c4b40['title']||_0x3dc4b8(0x1e5))+'\x0a',_0x1c4b40[_0x3dc4b8(0x27a)]&&(_0x2f52fe+=_0x3dc4b8(0x26d)+_0x1c4b40[_0x3dc4b8(0x27a)][_0x3dc4b8(0x275)](/\n/g,'\x5cn')+'\x0a'),_0x2f52fe+='STATUS:CONFIRMED\x0a',_0x2f52fe+='END:VEVENT\x0a';}),_0x2f52fe+=_0x431245(0x226),_0x2f52fe;}function downloadICS(_0x38d29b,_0x1749b4){const _0x369177=a0_0x4a46bb,_0x3a977c=new Blob([_0x1749b4],{'type':_0x369177(0x24b)}),_0x3aec68=URL['createObjectURL'](_0x3a977c),_0x388a69=document[_0x369177(0x1e9)]('a');_0x388a69['href']=_0x3aec68,_0x388a69[_0x369177(0x282)]=_0x38d29b,document[_0x369177(0x27c)][_0x369177(0x1f5)](_0x388a69),_0x388a69[_0x369177(0x230)](),document['body'][_0x369177(0x219)](_0x388a69),URL[_0x369177(0x29f)](_0x3aec68);}function exportTasksCSV(_0x4c7102){const _0xaf043a=a0_0x4a46bb,_0xe9def3=['#',_0xaf043a(0x220),_0xaf043a(0x1d9),'Quadrant',_0xaf043a(0x235)],_0x37ea4a=_0x4c7102[_0xaf043a(0x26c)](_0x437194=>(_0x437194[_0xaf043a(0x1fd)]||'')[_0xaf043a(0x285)]())[_0xaf043a(0x271)]((_0x5f52d4,_0x1d0c3f)=>[_0x1d0c3f+0x1,'\x22'+(_0x5f52d4[_0xaf043a(0x1fd)]||'')[_0xaf043a(0x275)](/"/g,'\x22\x22')+'\x22',_0x5f52d4[_0xaf043a(0x265)]||'',_0x5f52d4[_0xaf043a(0x237)]||'',_0x5f52d4[_0xaf043a(0x270)]||'']),_0x18ed25=[_0xe9def3['join'](','),..._0x37ea4a[_0xaf043a(0x271)](_0x3bd009=>_0x3bd009[_0xaf043a(0x281)](','))][_0xaf043a(0x281)]('\x0a'),_0xc6b897=new Blob([_0x18ed25],{'type':_0xaf043a(0x1d4)}),_0x15e8be=URL[_0xaf043a(0x1fc)](_0xc6b897),_0x2fdf2b=document[_0xaf043a(0x1e9)]('a');_0x2fdf2b[_0xaf043a(0x261)]=_0x15e8be,_0x2fdf2b[_0xaf043a(0x282)]=_0xaf043a(0x238),document[_0xaf043a(0x27c)]['appendChild'](_0x2fdf2b),_0x2fdf2b[_0xaf043a(0x230)](),document[_0xaf043a(0x27c)][_0xaf043a(0x219)](_0x2fdf2b),URL[_0xaf043a(0x29f)](_0x15e8be);}function exportAllCSV(_0x1cfa1f,_0x33ced0){const _0x16d236=a0_0x4a46bb,_0x322d4=_0x42fd49=>'\x22'+(_0x42fd49||'')[_0x16d236(0x275)](/"/g,'\x22\x22')+'\x22',_0x441492=[_0x16d236(0x251),_0x16d236(0x224),_0x16d236(0x1d9),_0x16d236(0x1df),_0x16d236(0x243),_0x16d236(0x21c),'Radar\x20Tier',_0x16d236(0x225),_0x16d236(0x242),_0x16d236(0x22f),_0x16d236(0x212),_0x16d236(0x259),_0x16d236(0x235)],_0x3a041c=[];_0x1cfa1f[_0x16d236(0x26c)](_0x3d7b52=>(_0x3d7b52[_0x16d236(0x1fd)]||'')[_0x16d236(0x285)]())[_0x16d236(0x29e)]((_0x17c46e,_0x24dd03)=>{const _0x1c5d83=_0x16d236;_0x3a041c[_0x1c5d83(0x290)]([_0x1c5d83(0x216),_0x322d4(_0x17c46e[_0x1c5d83(0x1fd)]),_0x17c46e[_0x1c5d83(0x265)]||'',_0x17c46e[_0x1c5d83(0x237)]||'',_0x1c5d83(0x273),'','','','','','','',_0x17c46e[_0x1c5d83(0x270)]||'']);}),_0x33ced0['forEach'](_0x2589d2=>{const _0x4b7ea6=_0x16d236,_0x21e482=_0x2589d2[_0x4b7ea6(0x1de)]?getRadarTier(_0x2589d2[_0x4b7ea6(0x1de)]):_0x4b7ea6(0x25c),_0xfc94cf=_0x2589d2[_0x4b7ea6(0x227)]?_0x2589d2[_0x4b7ea6(0x227)][_0x4b7ea6(0x26c)](_0x288a62=>_0x288a62[_0x4b7ea6(0x247)])[_0x4b7ea6(0x21b)]:0x0,_0xdbf6da=_0x2589d2['chunks']?_0x2589d2[_0x4b7ea6(0x227)]['length']:0x0,_0x437975=_0x2589d2[_0x4b7ea6(0x223)]?_0x4b7ea6(0x25e):_0x2589d2[_0x4b7ea6(0x269)]?_0x4b7ea6(0x1e2):_0x4b7ea6(0x1e7);_0x3a041c[_0x4b7ea6(0x290)]([_0x4b7ea6(0x27d),_0x322d4(_0x2589d2[_0x4b7ea6(0x208)]),'','',_0x2589d2[_0x4b7ea6(0x21f)]||_0x4b7ea6(0x273),_0x2589d2[_0x4b7ea6(0x1de)]||'',_0x21e482,_0x2589d2[_0x4b7ea6(0x293)]?_0x4b7ea6(0x25f):'Suggested',_0x2589d2[_0x4b7ea6(0x1d1)]||'',_0x437975,_0xdbf6da>0x0?_0xfc94cf:'',_0xdbf6da>0x0?_0xdbf6da:'','']),_0x2589d2[_0x4b7ea6(0x21f)]===_0x4b7ea6(0x26f)&&_0x2589d2['chunks']&&_0x2589d2[_0x4b7ea6(0x227)][_0x4b7ea6(0x21b)]>0x0&&_0x2589d2[_0x4b7ea6(0x227)]['forEach'](_0x182b15=>{const _0x31b677=_0x4b7ea6;_0x3a041c[_0x31b677(0x290)](['Horizon\x20(chunk)',_0x322d4(_0x182b15[_0x31b677(0x208)]),'','',_0x31b677(0x24a),_0x2589d2['dueDate']||'',_0x21e482,'','',_0x182b15[_0x31b677(0x247)]?_0x31b677(0x22c):'Pending','','',_0x322d4(_0x2589d2[_0x31b677(0x208)])]);});});const _0x48a2f6=[_0x441492[_0x16d236(0x281)](','),..._0x3a041c[_0x16d236(0x271)](_0x259096=>_0x259096[_0x16d236(0x281)](','))][_0x16d236(0x281)]('\x0a'),_0x4afbb9=new Blob([_0x48a2f6],{'type':_0x16d236(0x1d4)}),_0xec6581=URL[_0x16d236(0x1fc)](_0x4afbb9),_0xf740cf=document[_0x16d236(0x1e9)]('a');_0xf740cf[_0x16d236(0x261)]=_0xec6581;const _0xf1638a=new Date()[_0x16d236(0x20b)]()[_0x16d236(0x294)]('T')[0x0];_0xf740cf[_0x16d236(0x282)]=_0x16d236(0x280)+_0xf1638a+'.csv',document[_0x16d236(0x27c)]['appendChild'](_0xf740cf),_0xf740cf['click'](),document['body']['removeChild'](_0xf740cf),URL[_0x16d236(0x29f)](_0xec6581);}function parseCSV(_0xf06ab9){const _0x24b2dc=a0_0x4a46bb,_0x556f47=_0xf06ab9[_0x24b2dc(0x294)]('\x0a')[_0x24b2dc(0x26c)](_0x359199=>_0x359199[_0x24b2dc(0x285)]());if(_0x556f47['length']<0x2)return[];const _0x46551b=_0x556f47[_0x24b2dc(0x257)](0x1);return _0x46551b[_0x24b2dc(0x271)](_0x19e03f=>{const _0x1b2aff=_0x24b2dc,_0x19ae2f=[];let _0x5a6614='',_0x2222ee=![];for(let _0x1eaae1=0x0;_0x1eaae1<_0x19e03f[_0x1b2aff(0x21b)];_0x1eaae1++){const _0x4d5c8e=_0x19e03f[_0x1eaae1];if(_0x4d5c8e==='\x22'){_0x2222ee=!_0x2222ee;continue;}if(_0x4d5c8e===','&&!_0x2222ee){_0x19ae2f[_0x1b2aff(0x290)](_0x5a6614['trim']()),_0x5a6614='';continue;}_0x5a6614+=_0x4d5c8e;}return _0x19ae2f[_0x1b2aff(0x290)](_0x5a6614['trim']()),{'source':_0x19ae2f[0x0]||'Launch','text':_0x19ae2f[0x1]||'','minutes':_0x19ae2f[0x2]||'','quadrant':_0x19ae2f[0x3]||'','promotedFrom':_0x19ae2f[0xc]||_0x19ae2f[0x4]||'','type':_0x19ae2f[0x4]||_0x1b2aff(0x273),'dueDate':_0x19ae2f[0x5]||'','dateStatus':_0x19ae2f[0x7]||'','size':_0x19ae2f[0x8]||'S'};})[_0x24b2dc(0x26c)](_0xfc9de1=>_0xfc9de1[_0x24b2dc(0x1fd)]);}function requestNotificationPermission(){const _0x4a935c=a0_0x4a46bb;'Notification'in window&&Notification[_0x4a935c(0x252)]===_0x4a935c(0x298)&&Notification[_0x4a935c(0x256)]();}function sendNotification(_0x5f828b,_0x143d0e,_0x31a421){const _0x3be86b=a0_0x4a46bb;if(_0x3be86b(0x22e)in window&&Notification['permission']==='granted')try{new Notification(_0x5f828b,{'body':_0x143d0e||'','icon':_0x31a421||'','badge':_0x31a421||'','tag':_0x3be86b(0x23c),'requireInteraction':!![]});}catch(_0x1d3824){}}
+// TAPL Focus Engine — Core Module
+// Colours, themes, constants, shared styles, localStorage
+
+const C = {
+  purple: "#2D1B69",
+  purpleLight: "#3D2B79",
+  red: "#E8453C",
+  redDark: "#C73830",
+  green: "#22C55E",
+  greenDark: "#1EA34E",
+  amber: "#F59E0B",
+  teal: "#0891B2",
+  darkBg: "#1A1035",
+  darkCard: "#241850",
+  darkBorder: "#3D2B79",
+  lightBg: "#F3F0FF",
+  lightCard: "#FFFFFF",
+  lightBorder: "#E2DDF0"
+};
+
+const darkTheme = {
+  bg: C.darkBg,
+  card: C.darkCard,
+  border: C.darkBorder,
+  text: "#FFFFFF",
+  textMid: "#B8B0CC",
+  textDim: "#8B80A5",
+  textFaint: "#6B6080",
+  header: C.purple,
+  inputBg: "#1E1245",
+  inputBorder: "#3D2B79",
+  rowHover: "rgba(45,27,105,0.3)",
+  shadow: "0 2px 8px rgba(0,0,0,0.3)"
+};
+
+const lightTheme = {
+  bg: C.lightBg,
+  card: C.lightCard,
+  border: C.lightBorder,
+  text: "#1A1035",
+  textMid: "#6B6080",
+  textDim: "#8B80A5",
+  textFaint: "#B8B0CC",
+  header: C.purple,
+  inputBg: "#FFFFFF",
+  inputBorder: "#E2DDF0",
+  rowHover: "rgba(45,27,105,0.08)",
+  shadow: "0 2px 8px rgba(0,0,0,0.08)"
+};
+
+// Quadrant categories for Step 2
+const QUADRANTS = [
+  { id: "important_urgent", label: "DO", desc: "High Importance / High Urgency", short: "DO", color: "#22C55E", bg: "rgba(34,197,94,0.15)" },
+  { id: "important_not_urgent", label: "PLAN", desc: "High Importance / Low Urgency", short: "PLAN", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" },
+  { id: "not_important_urgent", label: "REACT", desc: "Low Importance / High Urgency", short: "REACT", color: "#E8453C", bg: "rgba(232,69,60,0.15)" },
+  { id: "not_important_not_urgent", label: "DROP", desc: "Low Importance / Low Urgency", short: "DROP", color: "#6B6080", bg: "rgba(107,96,128,0.15)" }
+];
+
+// Quadrant shortcodes for compact buttons
+const QUAD_BUTTONS = [
+  { id: "important_urgent", code: "HH", label: "DO" },
+  { id: "important_not_urgent", code: "HL", label: "PLAN" },
+  { id: "not_important_urgent", code: "LH", label: "REACT" },
+  { id: "not_important_not_urgent", code: "LL", label: "DROP" }
+];
+
+// Time buckets for categorise view
+const TIME_BUCKETS = [
+  { id: "5", label: "UP TO 5 MINS", max: 5, color: "#22C55E" },
+  { id: "30", label: "UP TO 30 MINS", max: 30, color: "#0891B2" },
+  { id: "60", label: "UP TO 60 MINS", max: 60, color: "#F59E0B" },
+  { id: "60+", label: "60+ MINS", max: Infinity, color: "#E8453C" }
+];
+
+// Shared label style
+const lbl = {
+  fontFamily: "'Montserrat', sans-serif",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "1.5px"
+};
+
+// Horizon radar tiers
+const RADAR = {
+  close: { label: "NOW — ≤7 DAYS", color: C.red, bg: "rgba(232,69,60,0.12)", desc: "Needs attention this week" },
+  mid: { label: "SOON — 8–21 DAYS", color: C.amber, bg: "rgba(245,158,11,0.12)", desc: "Coming up in 2-3 weeks" },
+  long: { label: "LATER — 22–60 DAYS", color: C.teal, bg: "rgba(8,145,178,0.12)", desc: "On the horizon, not yet urgent" },
+  someday: { label: "SOMEDAY — 60+ DAYS", color: C.green, bg: "rgba(34,197,94,0.12)", desc: "Far out, just keeping track" }
+};
+
+// localStorage helpers
+function loadData(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch(e) { return fallback; }
+}
+
+function saveData(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch(e) { console.error("Save failed:", e); }
+}
+// TAPL Focus Engine — Audio Module
+// Web Audio API tone generator for timer alerts
+
+const AudioEngine = (function() {
+  let ctx = null;
+
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
+  }
+
+  function playTone(freq, duration, type) {
+    try {
+      const c = getCtx();
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = type || "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, c.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(c.destination);
+      osc.start();
+      osc.stop(c.currentTime + duration);
+    } catch(e) {}
+  }
+
+  function playCountdownBeep() {
+    playTone(880, 0.15, "sine");
+  }
+
+  function playGoBeep() {
+    playTone(1200, 0.3, "sine");
+  }
+
+  function playBlockComplete() {
+    [0, 150, 300].forEach((delay, i) => {
+      setTimeout(() => playTone(660 + (i * 220), 0.25, "sine"), delay);
+    });
+  }
+
+  function playTaskComplete() {
+    playTone(880, 0.12, "triangle");
+    setTimeout(() => playTone(1100, 0.15, "triangle"), 100);
+  }
+
+  function playSessionComplete() {
+    [0, 200, 400, 600].forEach((delay, i) => {
+      setTimeout(() => playTone(523 + (i * 131), 0.35, "sine"), delay);
+    });
+  }
+
+  function playBreakStart() {
+    playTone(440, 0.3, "sine");
+    setTimeout(() => playTone(550, 0.3, "sine"), 200);
+  }
+
+  return {
+    playCountdownBeep,
+    playGoBeep,
+    playBlockComplete,
+    playTaskComplete,
+    playSessionComplete,
+    playBreakStart
+  };
+})();
+// TAPL Focus Engine — Block Management Logic
+// Sorting, time calculations, block helpers
+
+// Sort available tasks by different criteria
+function sortTasks(taskList, mode, allTasks) {
+  const list = [...taskList];
+  switch(mode) {
+    case "time_asc":
+      return list.sort((a, b) => (parseInt(a.minutes) || 0) - (parseInt(b.minutes) || 0));
+    case "time_desc":
+      return list.sort((a, b) => (parseInt(b.minutes) || 0) - (parseInt(a.minutes) || 0));
+    case "priority":
+      const order = ["important_urgent", "not_important_urgent", "important_not_urgent", "not_important_not_urgent"];
+      return list.sort((a, b) => order.indexOf(a.quadrant) - order.indexOf(b.quadrant));
+    default:
+      // Default = original order (by index in allTasks)
+      return list.sort((a, b) => allTasks.indexOf(a) - allTasks.indexOf(b));
+  }
+}
+
+// Calculate total minutes in a block
+function blockTotal(block, tasks) {
+  if (!block.taskIds) return 0;
+  return block.taskIds.reduce((sum, id) => {
+    const t = tasks.find(tk => tk.id === id);
+    return sum + (t ? (parseInt(t.minutes) || 0) : 0);
+  }, 0);
+}
+
+// Calculate session window in minutes from start/end times
+function calcSessionWindow(startTime, endTime) {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  let startMins = sh * 60 + sm;
+  let endMins = eh * 60 + em;
+  if (endMins <= startMins) endMins += 24 * 60; // crosses midnight
+  return endMins - startMins;
+}
+
+// Calculate total used time across all blocks (task time + break time)
+function calcUsedTime(blocks, tasks) {
+  return blocks.reduce((sum, b) => {
+    return sum + blockTotal(b, tasks) + (b.breakMins || 0);
+  }, 0);
+}
+
+// Get available tasks (not assigned to any block)
+function getAvailableTasks(activeTasks, blocks) {
+  const assigned = new Set();
+  blocks.forEach(b => (b.taskIds || []).forEach(id => assigned.add(id)));
+  return activeTasks.filter(t => !assigned.has(t.id));
+}
+
+// Create a new empty block
+function createBlock(blockNum) {
+  return {
+    id: "block_" + Date.now() + "_" + blockNum,
+    taskIds: [],
+    maxMins: 40,
+    breakMins: 10,
+    deferred: false
+  };
+}
+
+// Default blocks setup (3 blocks)
+function defaultBlocks() {
+  return [createBlock(1), createBlock(2), createBlock(3)];
+}
+// TAPL Focus Engine — Timer Logic
+// Countdown calculations, phase management, time formatting
+
+// Format seconds as MM:SS
+function formatTime(secs) {
+  if (secs < 0) secs = 0;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+
+// Get non-deferred blocks only (the ones that actually run)
+function getRunnableBlocks(blocks) {
+  return blocks.filter(b => !b.deferred && b.taskIds && b.taskIds.length > 0);
+}
+
+// Get tasks for a specific block
+function getBlockTasks(block, allTasks) {
+  return block.taskIds.map(id => allTasks.find(t => t.id === id)).filter(Boolean);
+}
+
+// Calculate total seconds for a block's work phase
+function blockWorkSeconds(block, allTasks) {
+  return block.taskIds.reduce((sum, id) => {
+    const t = allTasks.find(tk => tk.id === id);
+    return sum + (t ? (parseInt(t.minutes) || 0) * 60 : 0);
+  }, 0);
+}
+
+// Calculate task deadline within a block (cumulative seconds up to and including this task)
+function taskDeadline(block, taskId, allTasks) {
+  let cumulative = 0;
+  for (const id of block.taskIds) {
+    const t = allTasks.find(tk => tk.id === id);
+    cumulative += (t ? (parseInt(t.minutes) || 0) * 60 : 0);
+    if (id === taskId) return cumulative;
+  }
+  return cumulative;
+}
+
+// Calculate task start time within a block (cumulative seconds before this task)
+function taskStartTime(block, taskId, allTasks) {
+  let cumulative = 0;
+  for (const id of block.taskIds) {
+    if (id === taskId) return cumulative;
+    const t = allTasks.find(tk => tk.id === id);
+    cumulative += (t ? (parseInt(t.minutes) || 0) * 60 : 0);
+  }
+  return cumulative;
+}
+
+// Get current task based on elapsed time in block
+function getCurrentTask(block, elapsedSecs, allTasks, completedTaskIds, skippedTaskIds) {
+  let cumulative = 0;
+  for (const id of block.taskIds) {
+    const t = allTasks.find(tk => tk.id === id);
+    if (!t) continue; // task was deleted or no longer exists
+    const dur = (parseInt(t.minutes) || 0) * 60;
+    cumulative += dur;
+    if (completedTaskIds.has(id) || skippedTaskIds.has(id)) continue;
+    if (dur === 0) return { task: t, remaining: 0, total: 0 };
+    const remaining = cumulative - elapsedSecs;
+    if (remaining > 0) return { task: t, remaining, total: dur };
+  }
+  return null;
+}
+// TAPL Focus Engine — Horizon Logic
+// Data management, radar tier calculations, promote/demote helpers
+
+// Calculate days until a date
+function daysUntil(dateStr) {
+  if (!dateStr) return Infinity;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+}
+
+// Get radar tier based on days remaining
+function getRadarTier(dateStr) {
+  const days = daysUntil(dateStr);
+  if (days <= 7) return "close";
+  if (days <= 21) return "mid";
+  if (days <= 60) return "long";
+  return "someday";
+}
+
+// Tier display info
+const TIER_DISPLAY = {
+  close: { label: "NOW", range: "7 days or less", color: "#E8453C" },
+  mid: { label: "SOON", range: "8–21 days", color: "#F59E0B" },
+  long: { label: "LATER", range: "22–60 days", color: "#0891B2" },
+  someday: { label: "SOMEDAY", range: "60+ days", color: "#22C55E" }
+};
+
+// Create a new Horizon item
+function createHorizonItem(type, name, dueDate) {
+  return {
+    id: "hz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    type: type, // "task" or "project"
+    name: name,
+    dueDate: dueDate || "",
+    triggerDate: "",
+    chunks: [], // for projects: [{id, name, done}]
+    completed: false,
+    repeat: "none", // "none", "daily", "weekly", "monthly"
+    pulseFreq: "medium", // "high", "medium", "low"
+    autoRefresh: true, // if true, auto-reset on repeat cycle; if false, prompt user
+    lastCompletedAt: null,
+    needsRefreshPrompt: false, // true when repeat cycle elapsed but autoRefresh is off
+    createdAt: new Date().toISOString(),
+    lastReviewed: new Date().toISOString()
+  };
+}
+
+// Check if a repeating item should be reset (uncompleted)
+function shouldResetRepeat(item) {
+  if (!item.repeat || item.repeat === "none" || !item.lastCompletedAt) return false;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const last = new Date(item.lastCompletedAt);
+  last.setHours(0, 0, 0, 0);
+  const daysSince = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+  if (item.repeat === "daily" && daysSince >= 1) return true;
+  if (item.repeat === "weekly" && daysSince >= 7) return true;
+  if (item.repeat === "monthly" && daysSince >= 30) return true;
+  return false;
+}
+
+// Reset a repeating item — uncomplete it and its chunks
+function resetRepeatItem(item) {
+  const reset = { ...item, completed: false, lastReviewed: new Date().toISOString() };
+  if (reset.chunks && reset.chunks.length > 0) {
+    reset.chunks = reset.chunks.map(c => ({ ...c, done: false }));
+  }
+  return reset;
+}
+
+// Review cadence in days per radar tier
+const REVIEW_CADENCE = {
+  close: 1,    // NOW: daily
+  mid: 3,      // SOON: every 3 days
+  long: 7,     // LATER: weekly
+  someday: 14  // SOMEDAY: fortnightly
+};
+
+// Pulse frequency multipliers
+const PULSE_FREQ = {
+  high: 0.5,   // halve the cadence (check more often)
+  medium: 1,   // default — use radar tier cadence as-is
+  low: 2       // double the cadence (check less often)
+};
+
+// Get effective cadence for an item (radar tier × pulse frequency)
+function getEffectiveCadence(item) {
+  const tier = getRadarTier(item.dueDate);
+  const baseCadence = REVIEW_CADENCE[tier];
+  const freq = PULSE_FREQ[item.pulseFreq || "medium"] || 1;
+  return Math.max(1, Math.round(baseCadence * freq)); // minimum 1 day
+}
+
+// Calculate days since last review
+function daysSinceReview(item) {
+  if (!item.lastReviewed) return Infinity;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const last = new Date(item.lastReviewed);
+  last.setHours(0, 0, 0, 0);
+  return Math.floor((now - last) / (1000 * 60 * 60 * 24));
+}
+
+// Check if an item is overdue for review
+function isOverdueForReview(item) {
+  const cadence = getEffectiveCadence(item);
+  return daysSinceReview(item) >= cadence;
+}
+
+// Get escalation level: 0 = fine, 1 = needs review (amber), 2 = significantly overdue (red)
+function getEscalationLevel(item) {
+  const cadence = getEffectiveCadence(item);
+  const daysSince = daysSinceReview(item);
+  if (daysSince < cadence) return 0;
+  if (daysSince < cadence * 2) return 1;
+  return 2;
+}
+
+// Check if item is past due date
+function isPastDue(item) {
+  if (!item.dueDate) return false;
+  return daysUntil(item.dueDate) < 0;
+}
+
+// Create a Horizon project from Brain Dump tasks
+function createProjectFromTasks(projectName, taskTexts, dueDate) {
+  const item = createHorizonItem("project", projectName, dueDate);
+  item.chunks = taskTexts.map((text, i) => ({
+    id: "chunk_" + Date.now() + "_" + i,
+    name: text,
+    done: false
+  }));
+  return item;
+}
+
+// Get tasks from a Horizon item ready to promote to Brain Dump
+function getPromotableTasks(item) {
+  if (item.type === "task") {
+    return [{ text: item.name, minutes: "" }];
+  }
+  // Project: return undone chunks
+  return item.chunks
+    .filter(c => !c.done)
+    .map(c => ({ text: c.name, minutes: "" }));
+}
+
+// Load Horizon data (separate from session data)
+function loadHorizon() {
+  return loadData("tapl-horizon", []);
+}
+
+// Save Horizon data
+function saveHorizon(items) {
+  saveData("tapl-horizon", items);
+}
+
+// ICS Calendar Export
+function generateICS(events) {
+  // events: [{title, description, startDate, durationMins}]
+  let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//TAPL//Focus Engine//EN\nCALSCALE:GREGORIAN\n";
+
+  events.forEach(evt => {
+    const start = new Date(evt.startDate);
+    const end = new Date(start.getTime() + evt.durationMins * 60000);
+    const fmt = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const uid = "tapl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 8) + "@focusengine";
+
+    ics += "BEGIN:VEVENT\n";
+    ics += "UID:" + uid + "\n";
+    ics += "DTSTART:" + fmt(start) + "\n";
+    ics += "DTEND:" + fmt(end) + "\n";
+    ics += "SUMMARY:" + (evt.title || "Focus Engine Session") + "\n";
+    if (evt.description) {
+      ics += "DESCRIPTION:" + evt.description.replace(/\n/g, "\\n") + "\n";
+    }
+    ics += "STATUS:CONFIRMED\n";
+    ics += "END:VEVENT\n";
+  });
+
+  ics += "END:VCALENDAR";
+  return ics;
+}
+
+function downloadICS(filename, icsContent) {
+  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// CSV Export — tasks with all metadata
+function exportTasksCSV(tasks) {
+  const headers = ["#", "Task", "Minutes", "Quadrant", "Source Project"];
+  const rows = tasks
+    .filter(t => (t.text || "").trim())
+    .map((t, i) => [
+      i + 1,
+      '"' + (t.text || "").replace(/"/g, '""') + '"',
+      t.minutes || "",
+      t.quadrant || "",
+      t.promotedFrom || ""
+    ]);
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "focus-engine-session.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Combined CSV Export — all Launch tasks + all Horizon items in one file
+function exportAllCSV(tasks, horizonItems) {
+  const esc = (s) => '"' + (s || "").replace(/"/g, '""') + '"';
+  const headers = ["Source", "Name", "Minutes", "Quadrant", "Type", "Due Date", "Radar Tier", "Date Status", "Size", "Status", "Chunks Done", "Chunks Total", "Source Project"];
+  const rows = [];
+
+  // Launch tasks
+  tasks.filter(t => (t.text || "").trim()).forEach((t, i) => {
+    rows.push([
+      "Launch", esc(t.text), t.minutes || "", t.quadrant || "",
+      "task", "", "", "", "",
+      "", "", "", t.promotedFrom || ""
+    ]);
+  });
+
+  // Horizon items
+  horizonItems.forEach(item => {
+    const tier = item.dueDate ? getRadarTier(item.dueDate) : "someday";
+    const chunksDone = item.chunks ? item.chunks.filter(c => c.done).length : 0;
+    const chunksTotal = item.chunks ? item.chunks.length : 0;
+    const status = item.completed ? "Completed" : item.promoted ? "Promoted" : "Active";
+    rows.push([
+      "Horizon", esc(item.name), "", "",
+      item.type || "task", item.dueDate || "", tier,
+      item.dateConfirmed ? "Confirmed" : "Suggested",
+      item.size || "", status,
+      chunksTotal > 0 ? chunksDone : "", chunksTotal > 0 ? chunksTotal : "",
+      ""
+    ]);
+    // Add chunks as sub-rows for projects
+    if (item.type === "project" && item.chunks && item.chunks.length > 0) {
+      item.chunks.forEach(chunk => {
+        rows.push([
+          "Horizon (chunk)", esc(chunk.name), "", "",
+          "chunk", item.dueDate || "", tier,
+          "", "", chunk.done ? "Done" : "Pending",
+          "", "", esc(item.name)
+        ]);
+      });
+    }
+  });
+
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const date = new Date().toISOString().split("T")[0];
+  a.download = "focus-engine-full-export-" + date + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// CSV Import — reads a CSV and returns parsed rows with all fields
+function parseCSV(csvText) {
+  const lines = csvText.split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const dataLines = lines.slice(1);
+  return dataLines.map(line => {
+    const fields = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuotes = !inQuotes; continue; }
+      if (ch === ',' && !inQuotes) { fields.push(current.trim()); current = ""; continue; }
+      current += ch;
+    }
+    fields.push(current.trim());
+    return {
+      source: fields[0] || "Launch",
+      text: fields[1] || "",
+      minutes: fields[2] || "",
+      quadrant: fields[3] || "",
+      promotedFrom: fields[12] || fields[4] || "",
+      type: fields[4] || "task",
+      dueDate: fields[5] || "",
+      dateStatus: fields[7] || "",
+      size: fields[8] || "S",
+    };
+  }).filter(t => t.text);
+}
+
+// Push Notifications
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function sendNotification(title, body, icon) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body: body || "",
+        icon: icon || "",
+        badge: icon || "",
+        tag: "tapl-focus-engine",
+        requireInteraction: true
+      });
+    } catch(e) {}
+  }
+}
 </script>
 
 <script type="text/babel">
@@ -518,1027 +1105,7 @@ function App() {
           }}>
             {i + 1}
           </div>
-          <input type="checkbox" checked={isCompleted} onChange={() => toggleTaskComplete(task.id)} style={{ cursor: "pointer", flexShrink: 0 }} />
-          {task.promotedFrom && (
-            <span style={{
-              padding: "2px 6px", borderRadius: 3, flexShrink: 0,
-              background: task.promotedColor + "20",
-              border: `1px solid ${task.promotedColor}44`,
-              ...lbl, fontSize: 7, color: task.promotedColor, letterSpacing: "0.5px",
-              maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-            }}>{task.promotedFrom}</span>
-          )}
-          <input
-            value={task.text}
-            onChange={e => updateTask(i, "text", e.target.value)}
-            placeholder={i === 0 ? "What needs doing?" : ""}
-            style={{
-              flex: 1,
-              padding: "8px 10px",
-              background: task.promotedColor ? task.promotedColor + "08" : T.inputBg,
-              border: `1px solid ${task.text.trim() ? (task.promotedColor || C.green) + "44" : T.inputBorder}`,
-              borderRadius: 4,
-              color: T.text,
-              fontSize: 13,
-              fontFamily: "'Montserrat', sans-serif",
-              outline: "none",
-              transition: "border 0.15s",
-              opacity: isCompleted ? 0.4 : 1,
-              textDecoration: isCompleted ? "line-through" : "none"
-            }}
-          />
-          <input
-            value={task.minutes}
-            onChange={e => updateTask(i, "minutes", e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="—"
-            style={{
-              width: 70,
-              padding: "8px 6px",
-              background: T.inputBg,
-              border: `1px solid ${T.inputBorder}`,
-              borderRadius: 4,
-              color: T.text,
-              fontSize: 13,
-              fontFamily: "'Montserrat', sans-serif",
-              textAlign: "center",
-              outline: "none",
-              opacity: isCompleted ? 0.4 : 1
-            }}
-          />
-          <button onClick={() => deleteTask(i)} style={{
-            background: "transparent", border: "none", cursor: "pointer",
-            color: T.textFaint, fontSize: 14, padding: "4px", flexShrink: 0,
-            opacity: 0.5, transition: "opacity 0.15s"
-          }}>✕</button>
-        </div>
-        );
-      })}
 
-      {/* Add task button */}
-      <button onClick={addTask} style={{
-        width: "100%", marginTop: 8, padding: "10px",
-        background: "transparent", border: `1px dashed ${T.border}`,
-        borderRadius: 6, cursor: "pointer",
-        ...lbl, fontSize: 10, color: T.textDim, letterSpacing: "1px",
-        transition: "all 0.15s"
-      }}>+ ADD TASK</button>
-
-      {/* Task count */}
-      <div style={{ marginTop: 12, textAlign: "right", padding: "0 4px" }}>
-        <span style={{ ...lbl, fontSize: 10, color: taskCount > 0 ? C.green : T.textFaint }}>
-          {taskCount} TASK{taskCount !== 1 ? "S" : ""} CAPTURED
-        </span>
-      </div>
-
-      {/* Next step button */}
-      {taskCount > 0 && (
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button onClick={() => setStep(1)} style={{
-            background: C.red,
-            color: "#FFFFFF",
-            border: "none",
-            borderRadius: 6,
-            padding: "12px 32px",
-            cursor: "pointer",
-            ...lbl,
-            fontSize: 12,
-            letterSpacing: "1.5px",
-            transition: "background 0.15s"
-          }}>
-            NEXT → CATEGORISE
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  // --- Step 2: Categorise ---
-  const activeTasks = tasks.filter(t => ((t.text || "").trim()));
-  const [catMode, setCatMode] = useState("priority"); // "time" or "priority"
-  const [viewMode, setViewMode] = useState("priority"); // "time" or "priority" (for post-tagging views)
-
-  // --- Build Blocks State (Step 3) ---
-  const [blocks, setBlocks] = useState(() => {
-    const saved = loadData("tapl-blocks", defaultBlocks());
-    if (!Array.isArray(saved)) return defaultBlocks();
-    return saved.map(b => ({ ...b, taskIds: Array.isArray(b.taskIds) ? b.taskIds : [] }));
-  });
-  const [sessionStart, setSessionStart] = useState(() => loadData("tapl-session-start", "21:00"));
-  const [sessionEnd, setSessionEnd] = useState(() => loadData("tapl-session-end", "00:00"));
-  const [sortMode, setSortMode] = useState("default");
-  const [dragTaskId, setDragTaskId] = useState(null);
-  const [dragOverBlock, setDragOverBlock] = useState(null);
-  const [dragSourceBlock, setDragSourceBlock] = useState(null);
-  const [icsModal, setIcsModal] = useState(false);
-  const [icsDate, setIcsDate] = useState("");
-  const [icsTime, setIcsTime] = useState("09:00");
-  const [icsSelectedBlocks, setIcsSelectedBlocks] = useState(new Set());
-  // Horizon ICS state
-  const [hzIcsModal, setHzIcsModal] = useState(null); // item id
-  const [hzIcsDate, setHzIcsDate] = useState("");
-  const [hzIcsTime, setHzIcsTime] = useState("09:00");
-  const [hzIcsChunks, setHzIcsChunks] = useState(new Set());
-  const [hzIcsDuration, setHzIcsDuration] = useState(60);
-  const [hzIcsType, setHzIcsType] = useState("reminders"); // "reminders" or "schedule"
-  const [hzIcsSessions, setHzIcsSessions] = useState(3);
-
-  useEffect(() => { saveData("tapl-blocks", blocks); }, [blocks]);
-  useEffect(() => { saveData("tapl-session-start", sessionStart); }, [sessionStart]);
-  useEffect(() => { saveData("tapl-session-end", sessionEnd); }, [sessionEnd]);
-  useEffect(() => { saveData("tapl-completed-tasks", [...completedTaskIds]); }, [completedTaskIds]);
-  useEffect(() => { saveData("tapl-skipped-tasks", [...skippedTaskIds]); }, [skippedTaskIds]);
-
-  // Clean stale task IDs from blocks when tasks change
-  useEffect(() => {
-    const taskIdSet = new Set(tasks.map(t => t.id));
-    let needsClean = false;
-    blocks.forEach(b => {
-      if (b.taskIds && b.taskIds.some(id => !taskIdSet.has(id))) needsClean = true;
-    });
-    if (needsClean) {
-      setBlocks(prev => prev.map(b => ({
-        ...b,
-        taskIds: (b.taskIds || []).filter(id => taskIdSet.has(id))
-      })));
-    }
-  }, [tasks]);
-
-  // --- Run Session State (Step 4) ---
-  const [sessionActive, setSessionActive] = useState(false);
-  const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
-  const [phase, setPhase] = useState("idle"); // idle, countdown, work, break, done
-  const [countdownNum, setCountdownNum] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(0); // seconds remaining in current phase
-  const [paused, setPaused] = useState(false);
-  const [soundsOn, setSoundsOn] = useState(true);
-  const [completedTaskIds, setCompletedTaskIds] = useState(() => {
-    const saved = loadData("tapl-completed-tasks", []);
-    return new Set(Array.isArray(saved) ? saved : []);
-  });
-  const [skippedTaskIds, setSkippedTaskIds] = useState(() => {
-    const saved = loadData("tapl-skipped-tasks", []);
-    return new Set(Array.isArray(saved) ? saved : []);
-  });
-  const [taskTimeOffset, setTaskTimeOffset] = useState(0); // accumulated time saved by early complete/skip
-  const [completedBlockIds, setCompletedBlockIds] = useState(new Set());
-  const [taskPrompt, setTaskPrompt] = useState(null); // task id to show completion prompt for
-  const timerRef = useRef(null);
-  const deadlineRef = useRef(0);
-  const popupRef = useRef(null);
-  const taskDeadlineRef = useRef(0);
-
-  const runnableBlocks = getRunnableBlocks(blocks);
-  const currentBlock = runnableBlocks[currentBlockIdx];
-
-  // --- Horizon State (continued) ---
-  const [hzScreen, setHzScreen] = useState("dashboard"); // dashboard, capture, edit
-  const [collapsedTiers, setCollapsedTiers] = useState(new Set());
-  const [hzView, setHzView] = useState("timeline"); // "timeline" or "folders"
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState(new Set());
-  const [ungroupedCollapsed, setUngroupedCollapsed] = useState(false);
-  const [hzCaptureStep, setHzCaptureStep] = useState(0);
-  const [hzCaptureData, setHzCaptureData] = useState({});
-  const [hzEditId, setHzEditId] = useState(null);
-  const [hzPromoteModal, setHzPromoteModal] = useState(null); // itemId for promote-to-brain-dump
-  const [hzPromoteSelection, setHzPromoteSelection] = useState(new Set()); // selected chunk IDs for selective promote
-
-  useEffect(() => { saveHorizon(horizonItems); }, [horizonItems]);
-
-  const activeHzItems = horizonItems.filter(i => !i.completed);
-  const completedHzItems = horizonItems.filter(i => i.completed);
-
-  // Horizon CRUD
-  const addHorizonItem = (item) => setHorizonItems(prev => [...prev, item]);
-  const updateHorizonItem = (id, updates) => setHorizonItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
-  const deleteHorizonItem = (id) => { if (confirm("Delete this item?")) setHorizonItems(prev => prev.filter(i => i.id !== id)); };
-  const completeHorizonItem = (id) => updateHorizonItem(id, { completed: true, lastCompletedAt: new Date().toISOString() });
-  const uncompleteHorizonItem = (id) => updateHorizonItem(id, { completed: false });
-  const markReviewed = (id) => updateHorizonItem(id, { lastReviewed: new Date().toISOString() });
-
-  // Promote Horizon item → Brain Dump
-  // Project colours for promoted task tags
-  const PROJECT_COLORS = ["#E8453C", "#F59E0B", "#0891B2", "#22C55E", "#8B5CF6", "#EC4899", "#14B8A6", "#F97316"];
-  const getProjectColor = (projectName) => {
-    let hash = 0;
-    for (let i = 0; i < projectName.length; i++) hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
-    return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
-  };
-
-  const promoteTobrainDump = (itemId, selectedChunkIds) => {
-    const item = horizonItems.find(i => i.id === itemId);
-    if (!item) return;
-    const sourceName = item.name;
-    const sourceColor = getProjectColor(sourceName);
-
-    let newTasks;
-    if (item.type === "task") {
-      newTasks = [{ text: item.name, minutes: "", chunkId: null }];
-    } else if (selectedChunkIds && selectedChunkIds.size > 0) {
-      // Selective: only promote chosen chunks
-      newTasks = item.chunks
-        .filter(c => selectedChunkIds.has(c.id) && !c.done)
-        .map(c => ({ text: c.name, minutes: "", chunkId: c.id }));
-    } else {
-      // Promote all undone chunks
-      newTasks = item.chunks
-        .filter(c => !c.done)
-        .map(c => ({ text: c.name, minutes: "", chunkId: c.id }));
-    }
-
-    setTasks(prev => {
-      // Filter out empty rows, then append promoted tasks
-      const existing = prev.filter(t => (t.text || "").trim());
-      const promoted = newTasks.map(nt => ({
-        id: Date.now() + Math.random(),
-        text: nt.text,
-        minutes: nt.minutes || "",
-        promotedFrom: sourceName,
-        promotedColor: sourceColor,
-        horizonItemId: itemId,
-        horizonChunkId: nt.chunkId
-      }));
-      const result = [...existing, ...promoted];
-      return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
-    });
-    if (item.type === "task") {
-      updateHorizonItem(itemId, { promoted: true });
-    }
-    setHzPromoteModal(null);
-    setHzPromoteSelection(new Set());
-    setHorizonMode(false);
-    setStep(0);
-  };
-
-  // Send blocks to Horizon (replaces Defer)
-  const sendBlockToHorizon = (blockId, projectName, existingProjectId) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    const blockTaskTexts = block.taskIds.map(tid => {
-      const t = tasks.find(tk => tk.id === tid);
-      return t ? t.text : "";
-    }).filter(Boolean);
-
-    if (existingProjectId) {
-      // Add as chunks to existing project
-      setHorizonItems(prev => prev.map(item => {
-        if (item.id !== existingProjectId) return item;
-        const newChunks = blockTaskTexts.map((text, i) => ({
-          id: "chunk_" + Date.now() + "_" + i,
-          name: text,
-          done: false
-        }));
-        return { ...item, chunks: [...item.chunks, ...newChunks] };
-      }));
-    } else {
-      // Create new project
-      const project = createProjectFromTasks(projectName || "Untitled Project", blockTaskTexts, "");
-      addHorizonItem(project);
-    }
-
-    // Remove tasks from block and return to available
-    setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, taskIds: [] } : b));
-  };
-
-  // Timer tick — uses deadline for accuracy even when tab is backgrounded
-  useEffect(() => {
-    if (phase !== "work" && phase !== "break") return;
-    if (paused) return;
-
-    // Set deadline if not already set
-    if (!deadlineRef.current) {
-      deadlineRef.current = Date.now() + timeLeft * 1000;
-    }
-
-    const tick = () => {
-      const remaining = Math.round((deadlineRef.current - Date.now()) / 1000);
-      if (remaining <= 0) {
-        clearInterval(timerRef.current);
-        deadlineRef.current = 0;
-        setTimeLeft(0);
-        if (phase === "work") {
-          if (soundsOn) AudioEngine.playBlockComplete();
-          sendNotification("Block Complete", "Great work! Time for a break. Step away from the screen.");
-          setCompletedBlockIds(prev => new Set([...prev, currentBlock.id]));
-          if (currentBlockIdx < runnableBlocks.length - 1) {
-            setPhase("break");
-            const breakSecs = currentBlock.breakMins * 60;
-            deadlineRef.current = Date.now() + breakSecs * 1000;
-            setTimeLeft(breakSecs);
-            if (soundsOn) AudioEngine.playBreakStart();
-          } else {
-            setPhase("done");
-            if (soundsOn) AudioEngine.playSessionComplete();
-            sendNotification("Session Complete", "All blocks finished. Outstanding work!");
-          }
-        } else if (phase === "break") {
-          sendNotification("Break Over", "Time to focus. Next block starting now.");
-          setCurrentBlockIdx(prev => prev + 1);
-          setTaskTimeOffset(0);
-          setPhase("countdown");
-          setCountdownNum(3);
-          deadlineRef.current = 0;
-        }
-      } else {
-        setTimeLeft(remaining);
-      }
-    };
-
-    timerRef.current = setInterval(tick, 250); // tick 4x/sec for responsiveness
-    tick(); // immediate first tick
-
-    return () => clearInterval(timerRef.current);
-  }, [phase, paused, currentBlockIdx]);
-
-  // Countdown ticker
-  useEffect(() => {
-    if (phase !== "countdown") return;
-    if (countdownNum <= 0) {
-      // GO!
-      if (soundsOn) AudioEngine.playGoBeep();
-      const workSecs = currentBlock ? blockWorkSeconds(currentBlock, tasks) : 0;
-      setTimeLeft(workSecs);
-      setTaskTimeOffset(0);
-      deadlineRef.current = Date.now() + workSecs * 1000;
-      setPhase("work");
-      return;
-    }
-    const t = setTimeout(() => {
-      if (soundsOn) AudioEngine.playCountdownBeep();
-      setCountdownNum(prev => prev - 1);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [phase, countdownNum]);
-
-  const startSession = () => {
-    if (runnableBlocks.length === 0) return;
-    requestNotificationPermission();
-    setCurrentBlockIdx(0);
-    setCompletedTaskIds(new Set());
-    setSkippedTaskIds(new Set());
-    setTaskTimeOffset(0);
-    setCompletedBlockIds(new Set());
-    setTaskPrompt(null);
-    setPaused(false);
-    deadlineRef.current = 0;
-    setPhase("countdown");
-    setCountdownNum(3);
-  };
-
-  const resetSession = () => {
-    clearInterval(timerRef.current);
-    deadlineRef.current = 0;
-    setPhase("idle");
-    setSessionActive(false);
-    setPaused(false);
-    setCurrentBlockIdx(0);
-    setTimeLeft(0);
-    setTaskTimeOffset(0);
-    setCompletedTaskIds(new Set());
-    setSkippedTaskIds(new Set());
-    setCompletedBlockIds(new Set());
-    setTaskPrompt(null);
-  };
-
-  const resetBlock = () => {
-    clearInterval(timerRef.current);
-    deadlineRef.current = 0;
-    // Clear completed/skipped for tasks in current block only
-    if (currentBlock) {
-      const blockTaskSet = new Set(currentBlock.taskIds);
-      setCompletedTaskIds(prev => {
-        const next = new Set([...prev]);
-        blockTaskSet.forEach(id => next.delete(id));
-        return next;
-      });
-      setSkippedTaskIds(prev => {
-        const next = new Set([...prev]);
-        blockTaskSet.forEach(id => next.delete(id));
-        return next;
-      });
-      setCompletedBlockIds(prev => {
-        const next = new Set([...prev]);
-        next.delete(currentBlock.id);
-        return next;
-      });
-    }
-    setTaskPrompt(null);
-    setTaskTimeOffset(0);
-    setPaused(false);
-    setPhase("countdown");
-    setCountdownNum(3);
-  };
-
-  const resetTask = () => {
-    // Restart the current task's timer by resetting elapsed time to the task's start point
-    if (currentBlock && currentTaskInfo && currentTaskInfo.task) {
-      const taskStart = taskStartTime(currentBlock, currentTaskInfo.task.id, tasks);
-      const blockSecs = blockWorkSeconds(currentBlock, tasks);
-      const newTimeLeft = blockSecs - taskStart;
-      setTimeLeft(newTimeLeft);
-      deadlineRef.current = Date.now() + newTimeLeft * 1000;
-    }
-  };
-
-  const resetBrainDump = () => {
-    if (confirm("Clear all tasks? This will also clear categories, block assignments, and completion status.")) {
-      setTasks([{ id: Date.now(), text: "", minutes: "" }]);
-      setBlocks(defaultBlocks());
-      setCompletedTaskIds(new Set());
-      setSkippedTaskIds(new Set());
-      resetSession();
-    }
-  };
-
-  const importCSV = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".csv";
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const parsed = parseCSV(ev.target.result);
-        if (parsed.length === 0) { alert("No data found in CSV."); return; }
-
-        // Split into Launch and Horizon rows
-        const launchRows = parsed.filter(r => r.source === "Launch" || (!r.source.startsWith("Horizon")));
-        const horizonRows = parsed.filter(r => r.source === "Horizon");
-
-        // Import Launch tasks
-        if (launchRows.length > 0) {
-          setTasks(prev => {
-            const existing = prev.filter(t => (t.text || "").trim());
-            const newTasks = launchRows.map(pt => ({
-              id: Date.now() + Math.random(),
-              text: pt.text,
-              minutes: pt.minutes,
-              quadrant: pt.quadrant || "",
-              promotedFrom: pt.promotedFrom || ""
-            }));
-            const result = [...existing, ...newTasks];
-            return result.length > 0 ? result : [{ id: Date.now(), text: "", minutes: "" }];
-          });
-        }
-
-        // Import Horizon items (skip chunks — they're sub-rows)
-        if (horizonRows.length > 0) {
-          const newHzItems = horizonRows.map(r => {
-            const item = createHorizonItem(r.type || "task", r.text, r.dueDate || "");
-            item.dateConfirmed = r.dateStatus === "Confirmed";
-            item.size = r.size || "S";
-            // Backdate lastReviewed on import so pulse checks fire immediately
-            item.lastReviewed = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-            return item;
-          });
-          setHorizonItems(prev => [...prev, ...newHzItems]);
-        }
-
-        const msg = [];
-        if (launchRows.length > 0) msg.push(launchRows.length + " Launch task" + (launchRows.length !== 1 ? "s" : ""));
-        if (horizonRows.length > 0) msg.push(horizonRows.length + " Horizon item" + (horizonRows.length !== 1 ? "s" : ""));
-        alert("Imported: " + msg.join(", "));
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
-
-  const skipPhase = () => {
-    clearInterval(timerRef.current);
-    deadlineRef.current = 0;
-    if (phase === "work") {
-      setCompletedBlockIds(prev => new Set([...prev, currentBlock.id]));
-      if (currentBlockIdx < runnableBlocks.length - 1) {
-        const breakSecs = currentBlock.breakMins * 60;
-        setPhase("break");
-        setTimeLeft(breakSecs);
-        deadlineRef.current = Date.now() + breakSecs * 1000;
-        if (soundsOn) AudioEngine.playBreakStart();
-      } else {
-        setPhase("done");
-        if (soundsOn) AudioEngine.playSessionComplete();
-      }
-    } else if (phase === "break") {
-      setCurrentBlockIdx(prev => prev + 1);
-      setTaskTimeOffset(0);
-      setPhase("countdown");
-      setCountdownNum(3);
-    }
-  };
-
-  const completeTask = (taskId) => {
-    // Add the remaining time of this task to the offset so the next task starts fresh
-    if (currentTaskInfo && currentTaskInfo.task && currentTaskInfo.task.id === taskId) {
-      setTaskTimeOffset(prev => prev + currentTaskInfo.remaining);
-    }
-    setCompletedTaskIds(prev => new Set([...prev, taskId]));
-    setTaskPrompt(null);
-    if (soundsOn) AudioEngine.playTaskComplete();
-    // Sync back to Horizon: mark the chunk as done if this was a promoted task
-    const task = tasks.find(t => t.id === taskId);
-    if (task && task.horizonItemId && task.horizonChunkId) {
-      const hItem = horizonItems.find(i => i.id === task.horizonItemId);
-      if (hItem && hItem.chunks) {
-        updateHorizonItem(task.horizonItemId, {
-          chunks: hItem.chunks.map(c => c.id === task.horizonChunkId ? { ...c, done: true } : c)
-        });
-      }
-    }
-  };
-
-  const skipTask = (taskId) => {
-    // Add the remaining time of this task to the offset so the next task starts fresh
-    if (currentTaskInfo && currentTaskInfo.task && currentTaskInfo.task.id === taskId) {
-      setTaskTimeOffset(prev => prev + currentTaskInfo.remaining);
-    }
-    setSkippedTaskIds(prev => new Set([...prev, taskId]));
-    setTaskPrompt(null);
-  };
-
-  const openPopoutTimer = () => {
-    if (popupRef.current && !popupRef.current.closed) {
-      popupRef.current.focus();
-      return;
-    }
-    const w = 360, h = 420;
-    const left = window.screen.width - w - 20;
-    const top = 40;
-    const popup = window.open("", "tapl_timer", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=no`);
-    if (!popup) return;
-    popupRef.current = popup;
-    popup.document.write(`<!DOCTYPE html><html><head><title>Focus Timer</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Montserrat',sans-serif; overflow:hidden; transition:background 0.3s; }
-.lbl { font-weight:900; text-transform:uppercase; letter-spacing:1.5px; }
-</style></head><body><div id="r"></div>
-<script>
-const C = { red:"#E8453C", green:"#22C55E", purple:"#2D1B69", teal:"#0891B2", amber:"#F59E0B" };
-function fmt(s) { if(s<0)s=0; return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
-function update() {
-  const d = window.opener && window.opener.__taplTimer;
-  if (!d) { document.getElementById("r").innerHTML = "<div style='padding:40px;text-align:center;color:#888'>Waiting for session...</div>"; return; }
-  const dk = d.dark;
-  const bg = dk ? "#1A1035" : "#F3F0FF";
-  const card = dk ? "#241850" : "#FFFFFF";
-  const text = dk ? "#FFFFFF" : "#1A1035";
-  const dim = dk ? "#8B80A5" : "#6B6080";
-  const border = dk ? "#3D2B79" : "#E2DDF0";
-  document.body.style.background = bg;
-  const isWork = d.phase === "work";
-  const isBreak = d.phase === "break";
-  const isDone = d.phase === "done";
-  const isIdle = d.phase === "idle" || d.phase === "countdown";
-  let html = "<div style='padding:12px'>";
-  // Header
-  html += "<div style='text-align:center;margin-bottom:8px'>";
-  html += "<div class='lbl' style='font-size:8px;color:"+C.red+";letter-spacing:2px'>FOCUS ENGINE</div>";
-  if (isIdle) {
-    html += "<div style='font-size:11px;color:"+dim+";margin-top:12px'>"+( d.phase==="countdown" ? "Starting..." : "No active session")+"</div>";
-  } else if (isDone) {
-    html += "<div style='font-size:18px;margin-top:16px'>🎉</div>";
-    html += "<div class='lbl' style='font-size:12px;color:"+C.green+";margin-top:4px'>SESSION COMPLETE</div>";
-  } else {
-    // Block label
-    html += "<div class='lbl' style='font-size:9px;color:"+dim+";margin-top:8px'>BLOCK "+(d.currentBlockIdx+1)+" OF "+d.blockCount+" — "+(isWork?"WORK":"BREAK")+"</div>";
-    // Timer
-    html += "<div style='font-size:48px;font-weight:900;color:"+text+";margin:8px 0'>"+fmt(d.timeLeft)+"</div>";
-    // Current task
-    if (isWork && d.currentTaskName) {
-      html += "<div style='font-size:11px;color:"+C.teal+";margin-bottom:4px'>"+d.currentTaskName+"</div>";
-      if (d.taskRemaining > 0) html += "<div class='lbl' style='font-size:9px;color:"+C.green+"'>TASK: "+fmt(d.taskRemaining)+"</div>";
-    }
-    if (isBreak) html += "<div style='font-size:11px;color:"+C.purple+"'>Step away from the screen</div>";
-    // Pause indicator
-    if (d.paused) html += "<div class='lbl' style='font-size:10px;color:"+C.amber+";margin-top:6px'>⏸ PAUSED</div>";
-  }
-  html += "</div>";
-  // Task list (work phase only)
-  if (isWork && d.taskList && d.taskList.length > 0) {
-    html += "<div style='background:"+card+";border:1px solid "+border+";border-radius:6px;padding:8px;margin-top:8px'>";
-    html += "<div class='lbl' style='font-size:8px;color:"+dim+";margin-bottom:6px'>TASKS</div>";
-    d.taskList.forEach(function(t) {
-      const op = t.done || t.skipped ? "0.4" : "1";
-      const td = t.done ? "line-through" : "none";
-      const fw = t.current ? "700" : "400";
-      const col = t.current ? text : dim;
-      html += "<div style='display:flex;justify-content:space-between;padding:3px 0;opacity:"+op+";text-decoration:"+td+"'>";
-      html += "<span style='font-size:10px;color:"+col+";font-weight:"+fw+"'>"+t.text+"</span>";
-      if (t.skipped) html += "<span class='lbl' style='font-size:7px;color:"+C.amber+"'>SKIP</span>";
-      else html += "<span class='lbl' style='font-size:9px;color:"+dim+"'>"+( t.minutes||"?")+"m</span>";
-      html += "</div>";
-    });
-    html += "</div>";
-  }
-  html += "</div>";
-  document.getElementById("r").innerHTML = html;
-}
-setInterval(update, 250);
-update();
-<\/script></div>
-
-<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
-
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(error) { return { error }; }
-  render() {
-    if (this.state.error) {
-      return React.createElement("div", { style: { padding: 40, color: "#E8453C", fontFamily: "monospace", background: "#1A1035", minHeight: "100vh" } },
-        React.createElement("h2", null, "Something went wrong"),
-        React.createElement("pre", { style: { color: "#fff", fontSize: 12, whiteSpace: "pre-wrap" } }, this.state.error.toString()),
-        React.createElement("button", { onClick: () => { localStorage.clear(); window.location.reload(); }, style: { marginTop: 20, padding: "10px 20px", background: "#E8453C", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" } }, "Clear Data & Reload")
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function App() {
-  // --- Theme ---
-  const [dark, setDark] = useState(() => loadData("tapl-theme", true));
-  const T = dark ? darkTheme : lightTheme;
-  useEffect(() => { saveData("tapl-theme", dark); }, [dark]);
-
-  // --- Navigation ---
-  const [step, setStep] = useState(0);
-  const [horizonMode, setHorizonMode] = useState(false);
-  const [showLanding, setShowLanding] = useState(true);
-
-  // --- Horizon State (declared early for nav badge) ---
-  const [horizonItems, setHorizonItems] = useState(() => {
-    const items = loadHorizon();
-    if (!Array.isArray(items)) return [];
-    return items.map(i => {
-      const item = {
-        ...i,
-        chunks: Array.isArray(i.chunks) ? i.chunks : [],
-        completed: !!i.completed,
-        repeat: i.repeat || "none",
-        pulseFreq: i.pulseFreq || "medium",
-        autoRefresh: i.autoRefresh !== false, // default true for existing items
-        needsRefreshPrompt: !!i.needsRefreshPrompt,
-        lastCompletedAt: i.lastCompletedAt || null,
-        lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
-      };
-      // Handle repeating items whose cycle has elapsed
-      if (shouldResetRepeat(item)) {
-        if (item.autoRefresh !== false) {
-          return resetRepeatItem(item);
-        } else {
-          // Flag for user prompt instead of auto-resetting
-          return { ...item, needsRefreshPrompt: true };
-        }
-      }
-      return item;
-    });
-  });
-
-  // --- Horizon Folders ---
-  const [hzFolders, setHzFolders] = useState(() => {
-    const saved = loadData("tapl-hz-folders", []);
-    return Array.isArray(saved) ? saved : [];
-  });
-  useEffect(() => { saveData("tapl-hz-folders", hzFolders); }, [hzFolders]);
-
-  const addFolder = (name) => {
-    const id = "folder_" + Date.now();
-    setHzFolders(prev => [...prev, { id, name, collapsed: false, sortOrder: prev.length }]);
-    return id;
-  };
-  const renameFolder = (id, name) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
-  const toggleFolderCollapse = (id) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, collapsed: !f.collapsed } : f));
-  const deleteFolder = (id) => {
-    setHzFolders(prev => prev.filter(f => f.id !== id));
-    // Ungroup items in this folder
-    setHorizonItems(prev => prev.map(i => i.folderId === id ? { ...i, folderId: null } : i));
-  };
-  const moveFolderUp = (id) => {
-    setHzFolders(prev => {
-      const idx = prev.findIndex(f => f.id === id);
-      if (idx <= 0) return prev;
-      const next = [...prev];
-      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      return next;
-    });
-  };
-  const moveFolderDown = (id) => {
-    setHzFolders(prev => {
-      const idx = prev.findIndex(f => f.id === id);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const next = [...prev];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      return next;
-    });
-  };
-  const moveItemUp = (itemId) => {
-    setHorizonItems(prev => {
-      const idx = prev.findIndex(i => i.id === itemId);
-      if (idx <= 0) return prev;
-      const item = prev[idx];
-      const itemTier = getRadarTier(item.dueDate);
-      // Find previous item in the same tier
-      for (let j = idx - 1; j >= 0; j--) {
-        if (getRadarTier(prev[j].dueDate) === itemTier) {
-          const next = [...prev];
-          [next[j], next[idx]] = [next[idx], next[j]];
-          return next;
-        }
-      }
-      return prev;
-    });
-  };
-  const moveItemDown = (itemId) => {
-    setHorizonItems(prev => {
-      const idx = prev.findIndex(i => i.id === itemId);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const item = prev[idx];
-      const itemTier = getRadarTier(item.dueDate);
-      // Find next item in the same tier
-      for (let j = idx + 1; j < prev.length; j++) {
-        if (getRadarTier(prev[j].dueDate) === itemTier) {
-          const next = [...prev];
-          [next[idx], next[j]] = [next[j], next[idx]];
-          return next;
-        }
-      }
-      return prev;
-    });
-  };
-  const assignToFolder = (itemId, folderId) => {
-    setHorizonItems(prev => prev.map(i => i.id === itemId ? { ...i, folderId: folderId || null } : i));
-  };
-
-  // --- Brain Dump State (Step 1) ---
-  const [tasks, setTasks] = useState(() => {
-    const saved = loadData("tapl-tasks", null);
-    if (saved && Array.isArray(saved) && saved.length > 0) return saved;
-    return [{ id: Date.now(), text: "", minutes: "" }];
-  });
-
-  // Save tasks on change
-  useEffect(() => { saveData("tapl-tasks", tasks); }, [tasks]);
-
-  // Count non-empty tasks
-  const taskCount = tasks.filter(t => t && t.text && ((t.text || "").trim())).length;
-
-  // Update task field
-  const updateTask = (index, field, value) => {
-    setTasks(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
-  };
-
-  // Add a new empty task row
-  const addTask = () => {
-    setTasks(prev => [...prev, { id: Date.now() + Math.random(), text: "", minutes: "" }]);
-  };
-
-  // Delete a task by index
-  const deleteTask = (index) => {
-    setTasks(prev => {
-      const next = prev.filter((_, i) => i !== index);
-      if (next.length === 0) return [{ id: Date.now(), text: "", minutes: "" }];
-      return next;
-    });
-  };
-
-  // Toggle manual complete on a task
-  const toggleTaskComplete = (taskId) => {
-    setCompletedTaskIds(prev => {
-      const next = new Set([...prev]);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
-  };
-
-  // --- Step labels ---
-  const STEPS = [
-    { label: "BRAIN DUMP", num: "1" },
-    { label: "CATEGORISE", num: "2" },
-    { label: "BUILD BLOCKS", num: "3" },
-    { label: "RUN SESSION", num: "4" }
-  ];
-
-  // --- Header with LAUNCH / HORIZON parent tabs ---
-  const headerTabStyle = (isActive, color) => ({
-    background: isActive ? color : "rgba(255,255,255,0.08)",
-    border: `2px solid ${color}`,
-    borderRadius: 8,
-    padding: "8px 24px",
-    cursor: "pointer",
-    ...lbl,
-    fontSize: 11,
-    color: "#FFFFFF",
-    letterSpacing: "2px",
-    transition: "all 0.2s",
-    opacity: isActive ? 1 : 0.7,
-    minWidth: 100,
-    textAlign: "center"
-  });
-
-  const horizonAlertCount = horizonItems ? horizonItems.filter(i => !i.completed && isOverdueForReview(i)).length : 0;
-
-  const header = (
-    <div style={{
-      background: T.header,
-      padding: "0 20px",
-      height: 60,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      borderBottom: "none",
-      position: "sticky",
-      top: 0,
-      zIndex: 100
-    }}>
-      {/* Left: logo + Home */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <img src="data:image/png;base64,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" alt="TAPL" style={{ height: 40 }} />
-        <button onClick={() => setShowLanding(true)} style={{
-          background: "rgba(255,255,255,0.08)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 6,
-          padding: "6px 12px",
-          cursor: "pointer",
-          ...lbl,
-          fontSize: 9,
-          color: "#FFFFFF",
-          letterSpacing: "1px",
-          transition: "all 0.2s",
-          opacity: 0.7
-        }}>
-          ⌂ HOME
-        </button>
-      </div>
-      {/* Center: LAUNCH + title + HORIZON */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flex: 1 }}>
-        <button onClick={() => { setHorizonMode(false); }} style={headerTabStyle(!horizonMode, C.red)}>
-          LAUNCH
-        </button>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ ...lbl, fontSize: 18, color: "#FFFFFF", letterSpacing: "3px" }}>
-            FOCUS ENGINE
-          </div>
-          <div style={{ ...lbl, fontSize: 9, color: C.red, letterSpacing: "2px", marginTop: 2 }}>
-            THE ADHD PERFORMANCE LAB
-          </div>
-        </div>
-        <button onClick={() => setHorizonMode(true)} style={{ ...headerTabStyle(horizonMode, C.teal), position: "relative" }}>
-          HORIZON
-          {horizonAlertCount > 0 && !horizonMode && (
-            <span style={{
-              position: "absolute", top: -6, right: -6,
-              width: 16, height: 16, borderRadius: "50%",
-              background: C.red, color: "#FFF",
-              fontSize: 9, fontWeight: 900,
-              display: "flex", alignItems: "center", justifyContent: "center"
-            }}>{horizonAlertCount}</span>
-          )}
-        </button>
-      </div>
-      {/* Right: export + theme toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={() => exportAllCSV(tasks, horizonItems)} style={{
-          background: "rgba(255,255,255,0.1)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 6,
-          padding: "6px 14px",
-          cursor: "pointer",
-          ...lbl,
-          fontSize: 10,
-          color: "#FFFFFF",
-          letterSpacing: "1px"
-        }}>
-          ↓ CSV
-        </button>
-        <button onClick={() => setDark(!dark)} style={{
-          background: "rgba(255,255,255,0.1)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 6,
-          padding: "6px 14px",
-          cursor: "pointer",
-          ...lbl,
-          fontSize: 10,
-          color: "#FFFFFF",
-          letterSpacing: "1px"
-        }}>
-          {dark ? "☀ LIGHT" : "● DARK"}
-        </button>
-      </div>
-    </div>
-  );
-
-  // --- Step Navigation Bar (only shown in Focus mode) ---
-  const stepNav = !horizonMode ? (
-    <div style={{
-      display: "flex",
-      background: T.card,
-      borderTop: `3px solid ${C.red}`,
-      borderBottom: `1px solid ${T.border}`,
-      position: "sticky",
-      top: 60,
-      zIndex: 99,
-      height: 48
-    }}>
-      {STEPS.map((s, i) => {
-        const active = step === i;
-        return (
-          <button key={i} onClick={() => { setStep(i); }} style={{
-            flex: 1,
-            padding: "10px 4px",
-            background: active ? C.red : "transparent",
-            border: "none",
-            borderBottom: active ? `3px solid ${C.red}` : "3px solid transparent",
-            cursor: "pointer",
-            transition: "all 0.15s",
-            opacity: active ? 1 : 0.6
-          }}>
-            <div style={{ ...lbl, fontSize: 9, color: active ? "#FFFFFF" : T.textDim, letterSpacing: "1px" }}>
-              STEP {s.num}
-            </div>
-            <div style={{ ...lbl, fontSize: 10, color: active ? "#FFFFFF" : T.textMid, letterSpacing: "1px", marginTop: 2 }}>
-              {s.label}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  ) : null;
-
-  // --- Step 1: Brain Dump ---
-  const renderBrainDump = () => (
-    <div style={{ padding: "16px 12px", maxWidth: 700, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-        <div>
-          <div style={{ ...lbl, fontSize: 13, color: T.text }}>BRAIN DUMP</div>
-          <div style={{ fontSize: 11, color: T.textDim, marginTop: 4 }}>
-            Get everything out of your head. Task name + estimated minutes. Don't overthink it.
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 12, alignItems: "center" }}>
-          <button onClick={importCSV} style={{
-            background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4,
-            padding: "6px 10px", cursor: "pointer",
-            ...lbl, fontSize: 8, color: T.textDim, letterSpacing: "1px"
-          }}>↑ IMPORT CSV</button>
-          {taskCount > 0 && (
-            <button onClick={() => exportTasksCSV(tasks)} style={{
-              background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4,
-              padding: "6px 10px", cursor: "pointer",
-              ...lbl, fontSize: 8, color: T.textDim, letterSpacing: "1px"
-            }}>↓ EXPORT CSV</button>
-          )}
-          {taskCount > 0 && (
-            <button onClick={resetBrainDump} style={{
-              background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4,
-              padding: "6px 10px", cursor: "pointer",
-              ...lbl, fontSize: 8, color: T.textDim, letterSpacing: "1px",
-              transition: "all 0.15s"
-            }}>✕ CLEAR SESSION</button>
-          )}
-        </div>
-      </div>
-      <div style={{ marginBottom: 16 }} />
-
-      {/* Column headers */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 6, padding: "0 4px", alignItems: "center" }}>
-        <div style={{ width: 24 }} />
-        <div style={{ width: 22, ...lbl, fontSize: 9, color: T.textDim, textAlign: "center" }}>✓</div>
-        <div style={{ ...lbl, fontSize: 9, color: T.textDim, flex: 1 }}>TASK</div>
-        <div style={{ ...lbl, fontSize: 9, color: T.textDim, width: 70, textAlign: "center" }}>MINS</div>
-        <div style={{ width: 24 }} />
-      </div>
-
-      {/* Task rows */}
-      {tasks.map((task, i) => {
-        const isCompleted = completedTaskIds.has(task.id);
-        return (
-        <div key={task.id} style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 4,
-          alignItems: "center",
-          borderLeft: task.promotedColor ? `3px solid ${task.promotedColor}` : "3px solid transparent",
-          paddingLeft: 4,
-          borderRadius: 2
-        }}>
-          <div style={{
-            ...lbl,
-            fontSize: 9,
-            color: T.textFaint,
-            width: 22,
-            textAlign: "right",
-            flexShrink: 0
-          }}>
-            {i + 1}
-          </div>
-          <input type="checkbox" checked={isCompleted} onChange={() => toggleTaskComplete(task.id)} style={{ cursor: "pointer", flexShrink: 0 }} />
           {task.promotedFrom && (
             <span style={{
               padding: "2px 6px", borderRadius: 3, flexShrink: 0,
@@ -2718,13 +2285,13 @@ update();
                 }}
                 onDragEnd={() => { setDragTaskId(null); setDragOverBlock(null); setDragSourceBlock(null); }}
                 style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
                   padding: "6px 4px", borderBottom: `1px solid ${T.border}22`,
                   cursor: "grab", opacity: dragTaskId === task.id ? 0.4 : 1,
                   transition: "opacity 0.15s"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                  {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0 }} />}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 6, flex: 1, minWidth: 0 }}>
+                  {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0, marginTop: 3 }} />}
                   {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "20", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.promotedFrom}</span>}
                   <span style={{ fontSize: 11, color: T.text, wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.4 }}>
                     {task.text}
@@ -2896,7 +2463,7 @@ update();
                             }}
                             onDragEnd={() => { setDragTaskId(null); setDragOverBlock(null); setDragSourceBlock(null); }}
                             style={{
-                              display: "flex", alignItems: "center", gap: 4,
+                              display: "flex", alignItems: "flex-start", gap: 4,
                               background: q ? q.bg : T.border + "44",
                               border: `1px solid ${q ? q.color + "44" : T.border}`,
                               borderRadius: 6, padding: "4px 8px",
@@ -2904,11 +2471,10 @@ update();
                               textDecoration: isCompleted ? "line-through" : "none",
                               width: "100%", boxSizing: "border-box"
                           }}>
-                            {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0 }} />}
-                            <input type="checkbox" checked={isCompleted} onChange={(e) => { e.stopPropagation(); toggleTaskComplete(tid); }} style={{ cursor: "pointer", flexShrink: 0 }} />
+                            {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0, marginTop: 3 }} />}
                             {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.promotedFrom}</span>}
                             <span style={{ fontSize: 11, color: T.text, flex: 1, wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.4 }}>{task.text}</span>
-                            <span style={{ ...lbl, fontSize: 9, color: q ? q.color : T.textDim, flexShrink: 0 }}>{task.minutes}M</span>
+                            <span style={{ ...lbl, fontSize: 9, color: q ? q.color : T.textDim, flexShrink: 0, marginTop: 1 }}>{task.minutes}M</span>
                             <button onClick={() => removeTaskFromBlock(block.id, tid)} style={{
                               background: "transparent", border: "none", cursor: "pointer",
                               color: T.textDim, fontSize: 12, padding: "0 2px"
@@ -5045,87 +4611,59 @@ update();
 ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
 </script>
 
+</div><!-- end app-container -->
+
 <script>
-// ── AUTH0 CONFIG ────────────────────────────────────────────
+// ── AUTH0 CONFIG ─────────────────────────────────────────
 const AUTH0_DOMAIN = 'dev-e3lizbd6wrf6z3ah.us.auth0.com';
 const AUTH0_CLIENT_ID = 'Ij2mZP5IXGBFSC8THKHnKLbWWWExDonI';
-// ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 
 let currentEmail = '';
 
 async function sendOTP() {
   const email = document.getElementById('email-input').value.trim().toLowerCase();
-  if (!email || !email.includes('@')) {
-    showMsg('email-message', 'Please enter a valid email address.', 'error'); return;
-  }
+  if (!email || !email.includes('@')) { showMsg('email-message','Please enter a valid email address.','error'); return; }
   const btn = document.getElementById('send-otp-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Sending...';
   try {
     const res = await fetch('https://' + AUTH0_DOMAIN + '/passwordless/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: AUTH0_CLIENT_ID,
-        connection: 'email',
-        email: email,
-        send: 'code'
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ client_id: AUTH0_CLIENT_ID, connection:'email', email, send:'code' })
     });
     const data = await res.json();
-    if (data.error) {
-      showMsg('email-message', 'Access not recognised. Request access below.', 'error');
-      btn.disabled = false;
-      btn.innerHTML = 'Send Access Code →';
-      return;
-    }
+    if (data.error) { showMsg('email-message','Access not recognised. Please try again.','error'); btn.disabled=false; btn.innerHTML='Send Access Code →'; return; }
     currentEmail = email;
     document.getElementById('otp-email-display').textContent = email;
     showScreen('screen-otp');
-    showMsg('otp-message', 'Code sent — check your inbox and spam folder.', 'info');
+    showMsg('otp-message','Code sent — check your inbox and spam folder.','info');
     setTimeout(() => document.getElementById('d0').focus(), 100);
-  } catch(e) {
-    showMsg('email-message', 'Something went wrong. Please try again.', 'error');
-  }
+  } catch(e) { showMsg('email-message','Something went wrong. Please try again.','error'); }
   btn.disabled = false;
   btn.innerHTML = 'Send Access Code →';
 }
 
 async function verifyOTP() {
   const code = [0,1,2,3,4,5].map(i => document.getElementById('d'+i).value).join('');
-  if (code.length !== 6) { showMsg('otp-message', 'Please enter all 6 digits.', 'error'); return; }
+  if (code.length !== 6) { showMsg('otp-message','Please enter all 6 digits.','error'); return; }
   const btn = document.getElementById('verify-otp-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Verifying...';
   try {
     const res = await fetch('https://' + AUTH0_DOMAIN + '/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'http://auth0.com/oauth/grant-type/passwordless/otp',
-        client_id: AUTH0_CLIENT_ID,
-        username: currentEmail,
-        otp: code,
-        realm: 'email',
-        scope: 'openid profile email',
-        audience: 'https://' + AUTH0_DOMAIN + '/userinfo'
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ grant_type:'http://auth0.com/oauth/grant-type/passwordless/otp', client_id: AUTH0_CLIENT_ID, username: currentEmail, otp: code, realm:'email', scope:'openid profile email', audience:'https://' + AUTH0_DOMAIN + '/userinfo' })
     });
     const data = await res.json();
     if (data.error || !data.access_token) {
-      showMsg('otp-message', 'Invalid or expired code. Please try again.', 'error');
-      [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value = ''; });
+      showMsg('otp-message','Invalid or expired code. Please try again.','error');
+      [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
       document.getElementById('d0').focus();
-      btn.disabled = false;
-      btn.innerHTML = 'Verify & Enter →';
-      return;
+      btn.disabled=false; btn.innerHTML='Verify & Enter →'; return;
     }
     showApp();
-  } catch(e) {
-    showMsg('otp-message', 'Something went wrong. Please try again.', 'error');
-    btn.disabled = false;
-    btn.innerHTML = 'Verify & Enter →';
-  }
+  } catch(e) { showMsg('otp-message','Something went wrong. Please try again.','error'); btn.disabled=false; btn.innerHTML='Verify & Enter →'; }
 }
 
 function showApp() {
@@ -5134,8 +4672,7 @@ function showApp() {
 }
 
 function backToEmail() {
-  [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value = ''; });
-  document.getElementById('email-input').value = '';
+  [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
   hideMsg('email-message'); hideMsg('otp-message');
   showScreen('screen-email');
 }
@@ -5146,24 +4683,37 @@ function otpInput(el, idx) {
 }
 
 function otpKeydown(e, idx) {
-  if (e.key === 'Backspace' && !document.getElementById('d'+idx).value && idx > 0)
+  if (e.key==='Backspace' && !document.getElementById('d'+idx).value && idx > 0)
     document.getElementById('d'+(idx-1)).focus();
 }
 
+function otpPaste(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+  text.split('').forEach((ch, i) => { const el = document.getElementById('d'+i); if(el) el.value = ch; });
+  const last = Math.min(text.length, 5);
+  document.getElementById('d'+last).focus();
+}
+
 function showScreen(id) {
-  ['screen-email','screen-otp','screen-blocked'].forEach(s => {
-    document.getElementById(s).style.display = (s === id) ? 'block' : 'none';
+  ['screen-email','screen-otp'].forEach(s => {
+    document.getElementById(s).style.display = (s===id) ? 'block' : 'none';
   });
 }
-function showMsg(id, text, type) {
+
+function showMsg(id, msg, type) {
   const el = document.getElementById(id);
-  el.textContent = text; el.className = 'auth-message '+type; el.style.display = 'block';
+  el.textContent = msg; el.className = 'auth-message ' + type; el.style.display = 'block';
 }
+
 function hideMsg(id) { document.getElementById(id).style.display = 'none'; }
 
 document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
-  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') sendOTP(); });
+  if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
+  document.querySelectorAll('.otp-digit').forEach(el => {
+    el.addEventListener('paste', otpPaste);
+  });
 });
 </script>
 </body>
