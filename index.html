@@ -53,12 +53,12 @@
       <div class="auth-sub">Enter your 6-digit code</div>
       <p style="font-family:'Montserrat',sans-serif;font-size:13px;color:#8B80A5;margin-bottom:20px;">We sent a code to <span id="otp-email-display" style="color:#FFFFFF;font-weight:700;"></span></p>
       <div class="otp-inputs">
-        <input type="text" class="otp-digit" maxlength="1" id="d0" oninput="otpInput(this,0)" onkeydown="otpKeydown(event,0)" inputmode="numeric" />
-        <input type="text" class="otp-digit" maxlength="1" id="d1" oninput="otpInput(this,1)" onkeydown="otpKeydown(event,1)" inputmode="numeric" />
-        <input type="text" class="otp-digit" maxlength="1" id="d2" oninput="otpInput(this,2)" onkeydown="otpKeydown(event,2)" inputmode="numeric" />
-        <input type="text" class="otp-digit" maxlength="1" id="d3" oninput="otpInput(this,3)" onkeydown="otpKeydown(event,3)" inputmode="numeric" />
-        <input type="text" class="otp-digit" maxlength="1" id="d4" oninput="otpInput(this,4)" onkeydown="otpKeydown(event,4)" inputmode="numeric" />
-        <input type="text" class="otp-digit" maxlength="1" id="d5" oninput="otpInput(this,5)" onkeydown="otpKeydown(event,5)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d0" oninput="otpInput(this,0)" onkeydown="otpKeydown(event,0)" onpaste="otpPaste(event,0)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d1" oninput="otpInput(this,1)" onkeydown="otpKeydown(event,1)" onpaste="otpPaste(event,1)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d2" oninput="otpInput(this,2)" onkeydown="otpKeydown(event,2)" onpaste="otpPaste(event,2)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d3" oninput="otpInput(this,3)" onkeydown="otpKeydown(event,3)" onpaste="otpPaste(event,3)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d4" oninput="otpInput(this,4)" onkeydown="otpKeydown(event,4)" onpaste="otpPaste(event,4)" inputmode="numeric" />
+        <input type="text" class="otp-digit" maxlength="1" id="d5" oninput="otpInput(this,5)" onkeydown="otpKeydown(event,5)" onpaste="otpPaste(event,5)" inputmode="numeric" />
       </div>
       <button class="auth-btn" id="verify-otp-btn" onclick="verifyOTP()">Verify & Enter →</button>
       <button class="auth-btn-secondary" onclick="backToEmail()">← Use a different email</button>
@@ -774,12 +774,15 @@ function App() {
   });
   useEffect(() => { saveData("tapl-hz-folders", hzFolders); }, [hzFolders]);
 
-  const addFolder = (name) => {
+  const FOLDER_COLORS = ["#8B5CF6","#E8453C","#0891B2","#22C55E","#F59E0B","#EC4899","#14B8A6","#F97316","#6366F1","#84CC16"];
+  const addFolder = (name, color) => {
     const id = "folder_" + Date.now();
-    setHzFolders(prev => [...prev, { id, name, collapsed: false, sortOrder: prev.length }]);
+    const folderColor = color || FOLDER_COLORS[0];
+    setHzFolders(prev => [...prev, { id, name, color: folderColor, collapsed: false, sortOrder: prev.length }]);
     return id;
   };
   const renameFolder = (id, name) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
+  const updateFolderColor = (id, color) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, color } : f));
   const toggleFolderCollapse = (id) => setHzFolders(prev => prev.map(f => f.id === id ? { ...f, collapsed: !f.collapsed } : f));
   const deleteFolder = (id) => {
     setHzFolders(prev => prev.filter(f => f.id !== id));
@@ -1216,6 +1219,7 @@ function App() {
   const [dragTaskId, setDragTaskId] = useState(null);
   const [dragOverBlock, setDragOverBlock] = useState(null);
   const [dragSourceBlock, setDragSourceBlock] = useState(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
   const [icsModal, setIcsModal] = useState(false);
   const [icsDate, setIcsDate] = useState("");
   const [icsTime, setIcsTime] = useState("09:00");
@@ -1278,6 +1282,13 @@ function App() {
   const currentBlock = runnableBlocks[currentBlockIdx];
 
   // --- Horizon State (continued) ---
+  const [hzNewFolderModal, setHzNewFolderModal] = useState(false);
+  const [hzNewFolderName, setHzNewFolderName] = useState("");
+  const [hzNewFolderColor, setHzNewFolderColor] = useState("#8B5CF6");
+  const hzNewFolderCallbackRef = useRef(null);
+  const [hzEditFolderModal, setHzEditFolderModal] = useState(null); // folder id
+  const [hzEditFolderName, setHzEditFolderName] = useState("");
+  const [hzEditFolderColor, setHzEditFolderColor] = useState("#8B5CF6");
   const [hzScreen, setHzScreen] = useState("dashboard"); // dashboard, capture, edit
   const [collapsedTiers, setCollapsedTiers] = useState(new Set());
   const [hzView, setHzView] = useState("timeline"); // "timeline" or "folders"
@@ -2434,6 +2445,7 @@ update();
                     }
                     setDragTaskId(null);
                     setDragSourceBlock(null);
+                    setDragOverTaskId(null);
                   }}
                   style={{
                     padding: "8px 12px", minHeight: 40,
@@ -2453,6 +2465,7 @@ update();
                         if (!task) return null;
                         const q = getQuad(task.quadrant);
                         const isCompleted = completedTaskIds.has(tid);
+                        const isDragTarget = dragOverTaskId === tid && dragSourceBlock === block.id;
                         return (
                           <div key={tid}
                             draggable
@@ -2461,16 +2474,49 @@ update();
                               setDragSourceBlock(block.id);
                               e.dataTransfer.effectAllowed = "move";
                             }}
-                            onDragEnd={() => { setDragTaskId(null); setDragOverBlock(null); setDragSourceBlock(null); }}
+                            onDragEnd={() => { setDragTaskId(null); setDragOverBlock(null); setDragSourceBlock(null); setDragOverTaskId(null); }}
+                            onDragOver={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (dragSourceBlock === block.id && dragTaskId !== tid) {
+                                setDragOverTaskId(tid);
+                              }
+                            }}
+                            onDragLeave={() => { if (dragOverTaskId === tid) setDragOverTaskId(null); }}
+                            onDrop={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverTaskId(null);
+                              if (dragTaskId == null || dragTaskId === tid) return;
+                              if (dragSourceBlock === block.id) {
+                                // Intra-block reorder
+                                setBlocks(prev => prev.map(b => {
+                                  if (b.id !== block.id) return b;
+                                  const ids = [...b.taskIds];
+                                  const fromIdx = ids.indexOf(dragTaskId);
+                                  const toIdx = ids.indexOf(tid);
+                                  if (fromIdx === -1 || toIdx === -1) return b;
+                                  ids.splice(fromIdx, 1);
+                                  ids.splice(toIdx, 0, dragTaskId);
+                                  return { ...b, taskIds: ids };
+                                }));
+                                setDragTaskId(null);
+                                setDragSourceBlock(null);
+                              }
+                            }}
                             style={{
                               display: "flex", alignItems: "flex-start", gap: 4,
                               background: q ? q.bg : T.border + "44",
-                              border: `1px solid ${q ? q.color + "44" : T.border}`,
-                              borderRadius: 6, padding: "4px 8px",
+                              border: isDragTarget
+                                ? `2px solid ${C.green}`
+                                : `1px solid ${q ? q.color + "44" : T.border}`,
+                              borderRadius: 6, padding: isDragTarget ? "3px 7px" : "4px 8px",
                               cursor: "grab", opacity: isCompleted ? 0.4 : (dragTaskId === tid ? 0.4 : 1),
                               textDecoration: isCompleted ? "line-through" : "none",
-                              width: "100%", boxSizing: "border-box"
+                              width: "100%", boxSizing: "border-box",
+                              transition: "border 0.1s"
                           }}>
+                            <span style={{ fontSize: 10, color: T.textFaint, cursor: "grab", flexShrink: 0, marginTop: 2, opacity: 0.4 }}>⠿</span>
                             {q && <span style={{ width: 6, height: 6, borderRadius: "50%", background: q.color, flexShrink: 0, marginTop: 3 }} />}
                             {task.promotedFrom && <span style={{ padding: "1px 4px", borderRadius: 2, background: (task.promotedColor || C.teal) + "30", ...lbl, fontSize: 6, color: task.promotedColor || C.teal, flexShrink: 0, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.promotedFrom}</span>}
                             <span style={{ fontSize: 11, color: T.text, flex: 1, wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.4 }}>{task.text}</span>
@@ -3112,7 +3158,13 @@ update();
   };
 
   const startCapture = () => {
-    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", folderId: "", chunks: [] });
+    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", folderId: "", notes: "", chunks: [] });
+    setHzCaptureStep(0);
+    setHzScreen("capture");
+  };
+
+  const startCaptureInFolder = (folderId) => {
+    setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", folderId: folderId, notes: "", chunks: [] });
     setHzCaptureStep(0);
     setHzScreen("capture");
   };
@@ -3125,6 +3177,8 @@ update();
     item.repeat = d.repeat || "none";
     item.pulseFreq = d.pulseFreq || "medium";
     item.autoRefresh = d.autoRefresh !== false;
+    item.folderId = d.folderId || null;
+    item.notes = d.notes || "";
     if (d.type === "project" && d.chunks && d.chunks.length > 0) {
       item.chunks = d.chunks.filter(c => c.trim()).map((c, i) => ({ id: "chunk_" + Date.now() + "_" + i, name: c, done: false }));
     }
@@ -3140,7 +3194,116 @@ update();
   };
 
   const renderHorizon = () => {
-    // --- Edit mode (reuses capture wizard) ---
+
+    // --- Folder modals — rendered on every screen so + NEW works from edit/capture too ---
+    const folderModals = (
+      <>
+        {hzNewFolderModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300
+          }} onClick={() => setHzNewFolderModal(false)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+              padding: 24, width: 360, maxWidth: "90vw"
+            }}>
+              <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>NEW FOLDER</div>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
+              <input value={hzNewFolderName} onChange={e => setHzNewFolderName(e.target.value)}
+                placeholder="Folder name..." autoFocus
+                onKeyDown={e => { if (e.key === "Enter" && hzNewFolderName.trim()) { const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor); if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; } setHzNewFolderModal(false); } }}
+                style={{
+                  width: "100%", padding: "10px", background: T.inputBg,
+                  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                  color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                  outline: "none", marginBottom: 16, boxSizing: "border-box"
+                }} />
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                {FOLDER_COLORS.map(col => (
+                  <div key={col} onClick={() => setHzNewFolderColor(col)} style={{
+                    width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
+                    border: hzNewFolderColor === col ? `3px solid ${T.text}` : "3px solid transparent",
+                    boxSizing: "border-box", flexShrink: 0
+                  }} />
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setHzNewFolderModal(false)} style={{
+                  padding: "8px 16px", borderRadius: 6, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${T.border}`,
+                  ...lbl, fontSize: 10, color: T.textMid
+                }}>CANCEL</button>
+                <button onClick={() => { if (hzNewFolderName.trim()) { const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor); if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; } setHzNewFolderModal(false); } }} style={{
+                  padding: "8px 20px", borderRadius: 6, cursor: "pointer",
+                  background: hzNewFolderName.trim() ? C.teal : T.border,
+                  border: "none", color: "#FFF", ...lbl, fontSize: 10,
+                  opacity: hzNewFolderName.trim() ? 1 : 0.5
+                }}>CREATE ✓</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {hzEditFolderModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300
+          }} onClick={() => setHzEditFolderModal(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+              padding: 24, width: 360, maxWidth: "90vw"
+            }}>
+              <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>EDIT FOLDER</div>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
+              <input value={hzEditFolderName} onChange={e => setHzEditFolderName(e.target.value)}
+                placeholder="Folder name..." autoFocus
+                onKeyDown={e => { if (e.key === "Enter" && hzEditFolderName.trim()) { renameFolder(hzEditFolderModal, hzEditFolderName.trim()); updateFolderColor(hzEditFolderModal, hzEditFolderColor); setHzEditFolderModal(null); } }}
+                style={{
+                  width: "100%", padding: "10px", background: T.inputBg,
+                  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                  color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                  outline: "none", marginBottom: 16, boxSizing: "border-box"
+                }} />
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                {FOLDER_COLORS.map(col => (
+                  <div key={col} onClick={() => setHzEditFolderColor(col)} style={{
+                    width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
+                    border: hzEditFolderColor === col ? `3px solid ${T.text}` : "3px solid transparent",
+                    boxSizing: "border-box", flexShrink: 0
+                  }} />
+                ))}
+              </div>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+                borderRadius: 6, marginBottom: 16,
+                background: hzEditFolderColor + "15",
+                borderLeft: `5px solid ${hzEditFolderColor}`,
+                border: `1px solid ${hzEditFolderColor}33`,
+              }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzEditFolderColor }} />
+                <span style={{ ...lbl, fontSize: 12, color: hzEditFolderColor }}>{hzEditFolderName || "Folder name"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setHzEditFolderModal(null)} style={{
+                  padding: "8px 16px", borderRadius: 6, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${T.border}`,
+                  ...lbl, fontSize: 10, color: T.textMid
+                }}>CANCEL</button>
+                <button onClick={() => { if (hzEditFolderName.trim()) { renameFolder(hzEditFolderModal, hzEditFolderName.trim()); updateFolderColor(hzEditFolderModal, hzEditFolderColor); setHzEditFolderModal(null); } }} style={{
+                  padding: "8px 20px", borderRadius: 6, cursor: "pointer",
+                  background: hzEditFolderName.trim() ? hzEditFolderColor : T.border,
+                  border: "none", color: "#FFF", ...lbl, fontSize: 10,
+                  opacity: hzEditFolderName.trim() ? 1 : 0.5
+                }}>SAVE ✓</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+
+    // --- Edit mode ---
     if (hzScreen === "edit") {
       const d = hzCaptureData;
       const update = (field, val) => setHzCaptureData(prev => ({ ...prev, [field]: val }));
@@ -3152,6 +3315,7 @@ update();
         if (!existing) return;
         const updates = {
           name: d.name, dueDate: d.dueDate, dateConfirmed: d.dateConfirmed, size: d.size, repeat: d.repeat || "none", pulseFreq: d.pulseFreq || "medium", autoRefresh: d.autoRefresh !== false, folderId: d.folderId || null,
+          notes: d.notes || "",
           lastReviewed: new Date().toISOString()
         };
         if (existing.type === "project") {
@@ -3166,7 +3330,9 @@ update();
       };
 
       return (
-        <div style={{ padding: "20px", maxWidth: 550, margin: "0 auto" }}>
+        <>
+          {folderModals}
+          <div style={{ padding: "20px", maxWidth: 550, margin: "0 auto" }}>
           <div style={{ ...lbl, fontSize: 14, color: T.text, marginBottom: 20, textAlign: "center" }}>EDIT {d.type.toUpperCase()}</div>
           <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: "24px" }}>
             {/* Name */}
@@ -3275,15 +3441,12 @@ update();
                   ))}
                 </select>
                 <button onClick={() => {
-                  const name = prompt("New folder name:");
-                  if (name && name.trim()) {
-                    const id = addFolder(name.trim());
-                    update("folderId", id);
-                  }
+                  hzNewFolderCallbackRef.current = (id) => update("folderId", id);
+                  setHzNewFolderName(""); setHzNewFolderColor("#8B5CF6"); setHzNewFolderModal(true);
                 }} style={{
                   padding: "8px 12px", borderRadius: 6, cursor: "pointer",
                   background: C.purple + "15", border: `1px solid ${C.purple}44`,
-                  ...lbl, fontSize: 9, color: C.purple, whiteSpace: "nowrap"
+                  ...lbl, fontSize: 9, color: dark ? "#FFFFFF" : C.purple, whiteSpace: "nowrap"
                 }}>+ NEW</button>
               </div>
             </div>
@@ -3304,10 +3467,22 @@ update();
                 <button onClick={() => update("chunks", [...(d.chunks || []), ""])} style={{
                   padding: "6px 14px", borderRadius: 6, cursor: "pointer", width: "100%",
                   background: "transparent", border: `2px dashed ${T.border}`,
-                  ...lbl, fontSize: 9, color: T.textDim
+                  ...lbl, fontSize: 9, color: dark ? "#FFFFFF" : T.textDim
                 }}>+ ADD STEP</button>
               </div>
             )}
+            {/* Notes */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NOTES</div>
+              <textarea value={d.notes || ""} onChange={e => update("notes", e.target.value)}
+                placeholder="Context, links, blockers..." rows={4}
+                style={{
+                  width: "100%", padding: "10px", background: T.inputBg,
+                  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                  color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                  outline: "none", resize: "vertical", lineHeight: 1.5, boxSizing: "border-box"
+                }} />
+            </div>
             {/* Save / Cancel */}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
               <button onClick={() => { setHzScreen("dashboard"); setHzEditId(null); }} style={{
@@ -3322,6 +3497,7 @@ update();
             </div>
           </div>
         </div>
+        </>
       );
     }
 
@@ -3496,11 +3672,60 @@ update();
               <button onClick={() => update("chunks", [...(d.chunks || []), ""])} style={{
                 padding: "8px 16px", borderRadius: 6, cursor: "pointer", width: "100%",
                 background: "transparent", border: `2px dashed ${T.border}`,
-                ...lbl, fontSize: 10, color: T.textDim
+                ...lbl, fontSize: 10, color: dark ? "#FFFFFF" : T.textDim
               }}>+ ADD STEP</button>
             </div>
           </div>
         )] : []),
+        // Folder step
+        () => (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Add to a folder?</div>
+            <div style={{ fontSize: 12, color: T.textDim, marginBottom: 24 }}>Optional. You can organise this in a folder now, or skip and do it later.</div>
+            <div style={{ maxWidth: 360, margin: "0 auto", textAlign: "left" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <select value={d.folderId || ""} onChange={e => update("folderId", e.target.value || null)} style={{
+                  flex: 1, padding: "10px", borderRadius: 6,
+                  background: T.inputBg, border: `1px solid ${T.border}`, color: T.text,
+                  fontSize: 13, fontFamily: "'Montserrat', sans-serif", cursor: "pointer"
+                }}>
+                  <option value="">No folder</option>
+                  {hzFolders.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <button onClick={() => {
+                  hzNewFolderCallbackRef.current = (id) => update("folderId", id);
+                  setHzNewFolderName(""); setHzNewFolderColor("#8B5CF6"); setHzNewFolderModal(true);
+                }} style={{
+                  padding: "10px 14px", borderRadius: 6, cursor: "pointer",
+                  background: C.purple + "15", border: `1px solid ${C.purple}44`,
+                  ...lbl, fontSize: 9, color: dark ? "#FFFFFF" : C.purple, whiteSpace: "nowrap"
+                }}>+ NEW</button>
+              </div>
+              {d.folderId && hzFolders.find(f => f.id === d.folderId) && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+                  borderRadius: 6, background: (hzFolders.find(f => f.id === d.folderId).color || C.purple) + "15",
+                  border: `1px solid ${(hzFolders.find(f => f.id === d.folderId).color || C.purple)}44`
+                }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzFolders.find(f => f.id === d.folderId).color || C.purple }} />
+                  <span style={{ fontSize: 12, color: T.text, fontWeight: 700 }}>{hzFolders.find(f => f.id === d.folderId).name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ),
+        // Notes step
+        () => (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: T.text, marginBottom: 8 }}>Any notes?</div>
+            <div style={{ fontSize: 12, color: T.textDim, marginBottom: 20 }}>Context, links, blockers. Optional — you can add or edit this later.</div>
+            <textarea value={d.notes || ""} onChange={e => update("notes", e.target.value)}
+              placeholder="Add notes here..." rows={5}
+              style={{ ...hzInputStyle, resize: "vertical", lineHeight: 1.5, maxWidth: 400, display: "block", margin: "0 auto", textAlign: "left" }} />
+          </div>
+        ),
         // Final: Summary
         () => (
           <div style={{ textAlign: "center" }}>
@@ -3516,7 +3741,8 @@ update();
                 { label: "SIZE", value: d.size === "S" ? "Small — Under an hour" : d.size === "M" ? "Medium — A few hours" : "Large — Multiple sessions" },
                 { label: "REPEAT", value: d.repeat === "daily" ? "Daily" : d.repeat === "weekly" ? "Weekly" : d.repeat === "monthly" ? "Monthly" : "No repeat" },
                 { label: "PULSE CHECK", value: (d.pulseFreq || "medium") === "high" ? "High — check frequently" : (d.pulseFreq || "medium") === "low" ? "Low — check less often" : "Medium — standard cadence" },
-                { label: "RADAR", value: tierInfo ? `● ${tierInfo.label} (${TIER_DISPLAY[tier].range})` : "SOMEDAY" }
+                { label: "RADAR", value: tierInfo ? `● ${tierInfo.label} (${TIER_DISPLAY[tier].range})` : "SOMEDAY" },
+                ...(d.folderId && hzFolders.find(f => f.id === d.folderId) ? [{ label: "FOLDER", value: hzFolders.find(f => f.id === d.folderId).name }] : []),
               ].map(row => (
                 <div key={row.label} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -3534,6 +3760,12 @@ update();
                   ))}
                 </div>
               )}
+              {d.notes && d.notes.trim() && (
+                <div style={{ padding: "10px 12px" }}>
+                  <span style={{ ...lbl, fontSize: 10, color: T.textDim }}>NOTES</span>
+                  <div style={{ fontSize: 11, color: T.text, marginTop: 4, lineHeight: 1.5 }}>{d.notes}</div>
+                </div>
+              )}
             </div>
           </div>
         )
@@ -3543,7 +3775,9 @@ update();
       const isLast = hzCaptureStep === captureSteps.length - 1;
 
       return (
-        <div style={{ padding: "20px", maxWidth: 550, margin: "0 auto" }}>
+        <>
+          {folderModals}
+          <div style={{ padding: "20px", maxWidth: 550, margin: "0 auto" }}>
           <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 24 }}>
             {captureSteps.map((_, i) => (
               <div key={i} style={{
@@ -3576,7 +3810,8 @@ update();
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </>
       );
     }
 
@@ -3722,6 +3957,12 @@ update();
                         {item.name}
                       </span>
                     </div>
+                    {/* Notes */}
+                    {item.notes && item.notes.trim() && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: T.textMid, lineHeight: 1.5, fontStyle: "italic" }}>
+                        {item.notes}
+                      </div>
+                    )}
                     {/* Meta continued: promoted badge + progress bar + chunks */}
                     {item.promoted && (
                       <span style={{
@@ -3798,6 +4039,7 @@ update();
                           type: item.type, name: item.name, dueDate: item.dueDate || "",
                           dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
                           repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
+                          notes: item.notes || "",
                           chunks: item.chunks ? item.chunks.map(c => c.name) : []
                         });
                         setHzCaptureStep(1);
@@ -4041,10 +4283,7 @@ update();
               border: `1px solid ${hzSelectMode ? C.red : T.border}`, borderRadius: 6,
               padding: "6px 12px", cursor: "pointer", ...lbl, fontSize: 9, letterSpacing: "1px"
             }}>{hzSelectMode ? "✕ CANCEL" : "SELECT"}</button>
-            <button onClick={() => {
-              const name = prompt("Folder name:");
-              if (name && name.trim()) addFolder(name.trim());
-            }} style={{
+            <button onClick={() => { setHzNewFolderName(""); setHzNewFolderColor("#8B5CF6"); setHzNewFolderModal(true); }} style={{
               background: "transparent", color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 6,
               padding: "10px 16px", cursor: "pointer", ...lbl, fontSize: 11
             }}>+ FOLDER</button>
@@ -4055,7 +4294,6 @@ update();
           </div>
         </div>
 
-        {/* View toggle tabs */}
         <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
           <button onClick={() => setHzView("timeline")} style={{
             flex: 1, padding: "10px 16px", cursor: "pointer",
@@ -4136,6 +4374,7 @@ update();
                         type: item.type, name: item.name, dueDate: item.dueDate || "",
                         dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
                         repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
+                        notes: item.notes || "",
                         chunks: item.chunks ? item.chunks.map(c => c.name) : []
                       });
                       setHzCaptureStep(1);
@@ -4213,9 +4452,9 @@ update();
                   })}} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                     padding: "12px 16px", borderRadius: 8, cursor: "pointer",
-                    background: folderSelected ? C.purple + "18" : dark ? "rgba(255,255,255,0.04)" : C.purple + "10",
-                    border: `${folderSelected ? "2px" : "1px"} solid ${folderSelected ? C.purple : dark ? "rgba(255,255,255,0.1)" : C.purple + "33"}`,
-                    borderLeft: `5px solid ${C.purple}`
+                    background: folderSelected ? (folder.color || C.purple) + "18" : dark ? "rgba(255,255,255,0.04)" : (folder.color || C.purple) + "10",
+                    border: `${folderSelected ? "2px" : "1px"} solid ${folderSelected ? (folder.color || C.purple) : dark ? "rgba(255,255,255,0.1)" : (folder.color || C.purple) + "33"}`,
+                    borderLeft: `5px solid ${folder.color || C.purple}`
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {hzSelectMode ? (
@@ -4226,10 +4465,10 @@ update();
                           display: "inline-flex", alignItems: "center", justifyContent: "center"
                         }}>{(allFolderItemsSelected || folderSelected) && <span style={{ color: "#FFF", fontSize: 10, fontWeight: 900 }}>✓</span>}</span>
                       ) : (
-                        <span style={{ fontSize: 12, color: dark ? "#FFFFFF" : C.purple }}>{fCollapsed ? "▶" : "▼"}</span>
+                        <span style={{ fontSize: 12, color: folder.color || (dark ? "#FFFFFF" : C.purple) }}>{fCollapsed ? "▶" : "▼"}</span>
                       )}
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: dark ? "#FFFFFF" : C.purple }} />
-                      <span style={{ ...lbl, fontSize: 14, color: dark ? "#FFFFFF" : C.purple, letterSpacing: "2px" }}>{folder.name}</span>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: folder.color || (dark ? "#FFFFFF" : C.purple) }} />
+                      <span style={{ ...lbl, fontSize: 14, color: folder.color || (dark ? "#FFFFFF" : C.purple), letterSpacing: "2px" }}>{folder.name}</span>
                       <span style={{ fontSize: 11, color: T.textDim, fontWeight: 400 }}>({folderItems.length})</span>
                       {overdueCount > 0 && (
                         <span style={{
@@ -4245,6 +4484,11 @@ update();
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <button onClick={e => { e.stopPropagation(); startCaptureInFolder(folder.id); }} style={{
+                        padding: "2px 8px", borderRadius: 3, cursor: "pointer",
+                        background: (folder.color || C.teal) + "20", border: `1px solid ${folder.color || C.teal}`,
+                        fontSize: 9, color: folder.color || C.teal, ...lbl, whiteSpace: "nowrap"
+                      }}>+ ITEM</button>
                       <button onClick={e => { e.stopPropagation(); moveFolderUp(folder.id); }} style={{
                         padding: "2px 6px", borderRadius: 3, cursor: "pointer",
                         background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
@@ -4253,7 +4497,7 @@ update();
                         padding: "2px 6px", borderRadius: 3, cursor: "pointer",
                         background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
                       }}>↓</button>
-                      <button onClick={e => { e.stopPropagation(); const n = prompt("Rename folder:", folder.name); if (n && n.trim()) renameFolder(folder.id, n.trim()); }} style={{
+                      <button onClick={e => { e.stopPropagation(); setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderModal(folder.id); }} style={{
                         padding: "2px 6px", borderRadius: 3, cursor: "pointer",
                         background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
                       }}>✎</button>
@@ -4689,12 +4933,15 @@ function otpKeydown(e, idx) {
     document.getElementById('d'+(idx-1)).focus();
 }
 
-function otpPaste(e) {
+function otpPaste(e, startIdx) {
   e.preventDefault();
-  const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
-  text.split('').forEach((ch, i) => { const el = document.getElementById('d'+i); if(el) el.value = ch; });
-  const last = Math.min(text.length, 5);
-  document.getElementById('d'+last).focus();
+  const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0, 6 - (startIdx || 0));
+  text.split('').forEach((ch, i) => {
+    const el = document.getElementById('d' + ((startIdx || 0) + i));
+    if (el) el.value = ch;
+  });
+  const last = Math.min((startIdx || 0) + text.length, 5);
+  document.getElementById('d' + last).focus();
 }
 
 function showScreen(id) {
@@ -4713,9 +4960,6 @@ function hideMsg(id) { document.getElementById(id).style.display = 'none'; }
 document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
-  document.querySelectorAll('.otp-digit').forEach(el => {
-    el.addEventListener('paste', otpPaste);
-  });
 });
 </script>
 </body>
