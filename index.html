@@ -5016,28 +5016,37 @@ async function verifyOTP() {
 }
 
 async function showApp() {
-  // Show loading overlay while we fetch cloud data
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('cloud-loading').style.display = 'flex';
+  window.__taplUserEmail = currentEmail;
 
-  // Initialise Firebase path for this user
+  // Wrap all cloud operations in a 5s timeout — app always boots regardless
+  try {
+    await Promise.race([
+      _doCloudLoad(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+    ]);
+  } catch(e) {
+    console.warn('Cloud load skipped:', e.message, '— using local data');
+  }
+
+  document.getElementById('cloud-loading').style.display = 'none';
+  document.getElementById('app-container').style.display = 'block';
+}
+
+async function _doCloudLoad() {
   await initCloudForUser(currentEmail);
-
-  // Load cloud data
   const cloudData = await loadAllFromCloud();
 
   if (cloudData) {
-    // Cloud data exists — hydrate localStorage from cloud (cloud wins)
     CLOUD_KEYS.forEach(k => {
       if (cloudData[k] !== undefined) {
         localStorage.setItem(k, JSON.stringify(cloudData[k]));
       }
     });
   } else {
-    // No cloud data yet — check if localStorage has existing data to migrate
     const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
     if (hasLocalData) {
-      // First login with existing local data — migrate it up immediately
       const payload = {};
       CLOUD_KEYS.forEach(k => {
         const raw = localStorage.getItem(k);
@@ -5048,15 +5057,7 @@ async function showApp() {
         console.log('Local data migrated to cloud.');
       } catch(e) { console.error('Migration failed:', e); }
     }
-    // If no local data either — app starts with defaults (new user)
   }
-
-  // Make email available to React app
-  window.__taplUserEmail = currentEmail;
-
-  // Hide loading, show app
-  document.getElementById('cloud-loading').style.display = 'none';
-  document.getElementById('app-container').style.display = 'block';
 }
 
 function backToEmail() {
