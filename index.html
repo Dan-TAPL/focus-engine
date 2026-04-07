@@ -3196,6 +3196,29 @@ update();
   const renderHorizon = () => {
 
     // --- Folder modals — rendered on every screen so + NEW works from edit/capture too ---
+    const doCreateFolder = () => {
+      if (!hzNewFolderName.trim()) return;
+      const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor);
+      if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; }
+      setHzNewFolderModal(false);
+    };
+    const doSaveFolder = () => {
+      if (!hzEditFolderName.trim()) return;
+      renameFolder(hzEditFolderModal, hzEditFolderName.trim());
+      updateFolderColor(hzEditFolderModal, hzEditFolderColor);
+      setHzEditFolderModal(null);
+    };
+    const colorSwatches = (selectedColor, onSelect) => (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        {FOLDER_COLORS.map(col => (
+          <div key={col} onClick={() => onSelect(col)} style={{
+            width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
+            border: selectedColor === col ? `3px solid ${T.text}` : "3px solid transparent",
+            boxSizing: "border-box", flexShrink: 0
+          }} />
+        ))}
+      </div>
+    );
     const folderModals = (
       <>
         {hzNewFolderModal && (
@@ -3211,7 +3234,7 @@ update();
               <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
               <input value={hzNewFolderName} onChange={e => setHzNewFolderName(e.target.value)}
                 placeholder="Folder name..." autoFocus
-                onKeyDown={e => { if (e.key === "Enter" && hzNewFolderName.trim()) { const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor); if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; } setHzNewFolderModal(false); } }}
+                onKeyDown={e => { if (e.key === "Enter") doCreateFolder(); }}
                 style={{
                   width: "100%", padding: "10px", background: T.inputBg,
                   border: `1px solid ${T.inputBorder}`, borderRadius: 6,
@@ -3219,22 +3242,14 @@ update();
                   outline: "none", marginBottom: 16, boxSizing: "border-box"
                 }} />
               <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-                {FOLDER_COLORS.map(col => (
-                  <div key={col} onClick={() => setHzNewFolderColor(col)} style={{
-                    width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
-                    border: hzNewFolderColor === col ? `3px solid ${T.text}` : "3px solid transparent",
-                    boxSizing: "border-box", flexShrink: 0
-                  }} />
-                ))}
-              </div>
+              {colorSwatches(hzNewFolderColor, setHzNewFolderColor)}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setHzNewFolderModal(false)} style={{
                   padding: "8px 16px", borderRadius: 6, cursor: "pointer",
                   background: "transparent", border: `1px solid ${T.border}`,
                   ...lbl, fontSize: 10, color: T.textMid
                 }}>CANCEL</button>
-                <button onClick={() => { if (hzNewFolderName.trim()) { const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor); if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; } setHzNewFolderModal(false); } }} style={{
+                <button onClick={doCreateFolder} style={{
                   padding: "8px 20px", borderRadius: 6, cursor: "pointer",
                   background: hzNewFolderName.trim() ? C.teal : T.border,
                   border: "none", color: "#FFF", ...lbl, fontSize: 10,
@@ -3257,7 +3272,7 @@ update();
               <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
               <input value={hzEditFolderName} onChange={e => setHzEditFolderName(e.target.value)}
                 placeholder="Folder name..." autoFocus
-                onKeyDown={e => { if (e.key === "Enter" && hzEditFolderName.trim()) { renameFolder(hzEditFolderModal, hzEditFolderName.trim()); updateFolderColor(hzEditFolderModal, hzEditFolderColor); setHzEditFolderModal(null); } }}
+                onKeyDown={e => { if (e.key === "Enter") doSaveFolder(); }}
                 style={{
                   width: "100%", padding: "10px", background: T.inputBg,
                   border: `1px solid ${T.inputBorder}`, borderRadius: 6,
@@ -3265,21 +3280,13 @@ update();
                   outline: "none", marginBottom: 16, boxSizing: "border-box"
                 }} />
               <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-                {FOLDER_COLORS.map(col => (
-                  <div key={col} onClick={() => setHzEditFolderColor(col)} style={{
-                    width: 28, height: 28, borderRadius: "50%", background: col, cursor: "pointer",
-                    border: hzEditFolderColor === col ? `3px solid ${T.text}` : "3px solid transparent",
-                    boxSizing: "border-box", flexShrink: 0
-                  }} />
-                ))}
-              </div>
+              {colorSwatches(hzEditFolderColor, setHzEditFolderColor)}
               <div style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
                 borderRadius: 6, marginBottom: 16,
                 background: hzEditFolderColor + "15",
                 borderLeft: `5px solid ${hzEditFolderColor}`,
-                border: `1px solid ${hzEditFolderColor}33`,
+                border: `1px solid ${hzEditFolderColor}33`
               }}>
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzEditFolderColor }} />
                 <span style={{ ...lbl, fontSize: 12, color: hzEditFolderColor }}>{hzEditFolderName || "Folder name"}</span>
@@ -3290,7 +3297,7 @@ update();
                   background: "transparent", border: `1px solid ${T.border}`,
                   ...lbl, fontSize: 10, color: T.textMid
                 }}>CANCEL</button>
-                <button onClick={() => { if (hzEditFolderName.trim()) { renameFolder(hzEditFolderModal, hzEditFolderName.trim()); updateFolderColor(hzEditFolderModal, hzEditFolderColor); setHzEditFolderModal(null); } }} style={{
+                <button onClick={doSaveFolder} style={{
                   padding: "8px 20px", borderRadius: 6, cursor: "pointer",
                   background: hzEditFolderName.trim() ? hzEditFolderColor : T.border,
                   border: "none", color: "#FFF", ...lbl, fontSize: 10,
@@ -3303,7 +3310,7 @@ update();
       </>
     );
 
-    // --- Edit mode ---
+        // --- Edit mode ---
     if (hzScreen === "edit") {
       const d = hzCaptureData;
       const update = (field, val) => setHzCaptureData(prev => ({ ...prev, [field]: val }));
@@ -4268,6 +4275,56 @@ update();
 
     return (
       <div style={{ padding: "16px 12px", maxWidth: 900, margin: "0 auto" }}>
+        {folderModals}
+        {/* Edit folder modal — also rendered directly here to ensure it fires on dashboard */}
+        {hzEditFolderModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400
+          }} onClick={() => setHzEditFolderModal(null)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+              padding: 24, width: 360, maxWidth: "90vw"
+            }}>
+              <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>EDIT FOLDER</div>
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
+              <input value={hzEditFolderName} onChange={e => setHzEditFolderName(e.target.value)}
+                placeholder="Folder name..." autoFocus
+                onKeyDown={e => { if (e.key === "Enter") doSaveFolder(); }}
+                style={{
+                  width: "100%", padding: "10px", background: T.inputBg,
+                  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                  color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                  outline: "none", marginBottom: 16, boxSizing: "border-box"
+                }} />
+              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
+              {colorSwatches(hzEditFolderColor, setHzEditFolderColor)}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+                borderRadius: 6, marginBottom: 16,
+                background: hzEditFolderColor + "15",
+                borderLeft: `5px solid ${hzEditFolderColor}`,
+                border: `1px solid ${hzEditFolderColor}33`
+              }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzEditFolderColor }} />
+                <span style={{ ...lbl, fontSize: 12, color: hzEditFolderColor }}>{hzEditFolderName || "Folder name"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setHzEditFolderModal(null)} style={{
+                  padding: "8px 16px", borderRadius: 6, cursor: "pointer",
+                  background: "transparent", border: `1px solid ${T.border}`,
+                  ...lbl, fontSize: 10, color: T.textMid
+                }}>CANCEL</button>
+                <button onClick={doSaveFolder} style={{
+                  padding: "8px 20px", borderRadius: 6, cursor: "pointer",
+                  background: hzEditFolderName.trim() ? hzEditFolderColor : T.border,
+                  border: "none", color: "#FFF", ...lbl, fontSize: 10,
+                  opacity: hzEditFolderName.trim() ? 1 : 0.5
+                }}>SAVE ✓</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 11, color: T.textDim }}>
@@ -4483,29 +4540,30 @@ update();
                         }}>{needsReviewCount}</span>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); startCaptureInFolder(folder.id); }} style={{
-                        padding: "2px 8px", borderRadius: 3, cursor: "pointer",
+                        width: 64, height: 24, borderRadius: 4, cursor: "pointer", flexShrink: 0,
                         background: (folder.color || C.teal) + "20", border: `1px solid ${folder.color || C.teal}`,
-                        fontSize: 9, color: folder.color || C.teal, ...lbl, whiteSpace: "nowrap"
+                        fontSize: 9, color: folder.color || C.teal, ...lbl, display: "flex", alignItems: "center", justifyContent: "center"
                       }}>+ ITEM</button>
-                      <button onClick={e => { e.stopPropagation(); moveFolderUp(folder.id); }} style={{
-                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
-                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
-                      }}>↑</button>
-                      <button onClick={e => { e.stopPropagation(); moveFolderDown(folder.id); }} style={{
-                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
-                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
-                      }}>↓</button>
-                      <button onClick={e => { e.stopPropagation(); setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderModal(folder.id); }} style={{
-                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
-                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
-                      }}>✎</button>
-                      <button onClick={e => { e.stopPropagation(); if (confirm("Delete folder? Items will be ungrouped.")) deleteFolder(folder.id); }} style={{
-                        padding: "2px 6px", borderRadius: 3, cursor: "pointer",
-                        background: "transparent", border: `1px solid ${T.border}`, fontSize: 9, color: T.textDim
-                      }}>✕</button>
-                      <span style={{ ...lbl, fontSize: 10, color: T.textDim, marginLeft: 8 }}>{folderItems.length} ITEM{folderItems.length !== 1 ? "S" : ""}</span>
+                      <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                        {[
+                          { label: "↑", onClick: () => moveFolderUp(folder.id) },
+                          { label: "↓", onClick: () => moveFolderDown(folder.id) },
+                          { label: "✎", onClick: () => { setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderModal(folder.id); } },
+                          { label: "✕", onClick: () => { if (window.confirm('Delete folder? Items will be ungrouped.')) deleteFolder(folder.id); } },
+                        ].map(btn => (
+                          <button key={btn.label} onClick={e => { e.stopPropagation(); btn.onClick(); }} style={{
+                            width: 24, height: 24, borderRadius: 3, cursor: "pointer", flexShrink: 0,
+                            background: "transparent", border: `1px solid ${T.border}`,
+                            fontSize: 10, color: T.textDim,
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                          }}>{btn.label}</button>
+                        ))}
+                      </div>
+                      <span style={{ ...lbl, fontSize: 9, color: T.textDim, width: 52, textAlign: "right", flexShrink: 0 }}>
+                        {folderItems.length} ITEM{folderItems.length !== 1 ? "S" : ""}
+                      </span>
                     </div>
                   </div>
                   {!fCollapsed && (
