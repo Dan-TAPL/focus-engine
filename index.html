@@ -501,36 +501,125 @@ function createHorizonItem(type, name, dueDate) {
     completed: false,
     repeat: "none", // "none", "daily", "weekly", "monthly"
     pulseFreq: "medium", // "high", "medium", "low"
-    autoRefresh: true, // if true, auto-reset on repeat cycle; if false, prompt user
+    needsCarryForward: false,
     lastCompletedAt: null,
-    needsRefreshPrompt: false, // true when repeat cycle elapsed but autoRefresh is off
     createdAt: new Date().toISOString(),
     lastReviewed: new Date().toISOString()
   };
 }
 
-// Check if a repeating item should be reset (uncompleted)
+// ── Repeat reset logic — calendar boundary based ─────────────────────────────
+
+// Get the Sunday midnight that closes the week containing a given date
+// Sunday is the END of the week (week runs Mon→Sun)
+function getWeekBoundary(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // Day 0=Sun, 1=Mon … 6=Sat. We want next Sunday (or same day if Sunday)
+  const day = d.getDay(); // 0=Sun
+  const daysUntilSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysUntilSunday);
+  return d; // midnight Sunday that closes this week
+}
+
+// Get the last day of the month for a given date (at midnight)
+function getMonthBoundary(date) {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 0, 0, 0, 0); // day 0 of next month = last day of this month
+}
+
+// Get midnight tonight (start of tomorrow)
+function getMidnightTonight() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
+// Check if a repeating item has crossed its reset boundary
 function shouldResetRepeat(item) {
-  if (!item.repeat || item.repeat === "none" || !item.lastCompletedAt) return false;
+  if (!item.repeat || item.repeat === "none") return false;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const last = new Date(item.lastCompletedAt);
-  last.setHours(0, 0, 0, 0);
-  const daysSince = Math.floor((now - last) / (1000 * 60 * 60 * 24));
-  if (item.repeat === "daily" && daysSince >= 1) return true;
-  if (item.repeat === "weekly" && daysSince >= 7) return true;
-  if (item.repeat === "monthly" && daysSince >= 30) return true;
+
+  // If never completed, use createdAt as the reference point
+  const refDate = item.lastCompletedAt
+    ? new Date(item.lastCompletedAt)
+    : (item.createdAt ? new Date(item.createdAt) : null);
+  if (!refDate) return false;
+
+  if (item.repeat === "daily") {
+    // Resets every midnight — if ref date is before today, reset
+    const refDay = new Date(refDate);
+    refDay.setHours(0, 0, 0, 0);
+    return now > refDay;
+  }
+  if (item.repeat === "weekly") {
+    // Resets at midnight on the Sunday that closes the ref week
+    const boundary = getWeekBoundary(refDate);
+    return now > boundary;
+  }
+  if (item.repeat === "monthly") {
+    // Resets at midnight on the last day of the ref month
+    const boundary = getMonthBoundary(refDate);
+    return now > boundary;
+  }
   return false;
 }
 
-// Reset a repeating item — uncomplete it and its chunks
-function resetRepeatItem(item) {
-  const reset = { ...item, completed: false, lastReviewed: new Date().toISOString() };
-  if (reset.chunks && reset.chunks.length > 0) {
-    reset.chunks = reset.chunks.map(c => ({ ...c, done: false }));
+// Calculate ms until the next reset boundary fires (for live midnight timer)
+function msUntilNextReset(item) {
+  const now = new Date();
+  const midnight = getMidnightTonight();
+  if (item.repeat === "daily") return midnight - now;
+  if (item.repeat === "weekly") {
+    const boundary = getWeekBoundary(new Date());
+    const target = new Date(boundary);
+    target.setDate(target.getDate() + 1); // midnight after Sunday
+    return target > now ? target - now : getMidnightTonight() - now;
   }
-  return reset;
+  if (item.repeat === "monthly") {
+    const boundary = getMonthBoundary(new Date());
+    const target = new Date(boundary);
+    target.setDate(target.getDate() + 1);
+    return target > now ? target - now : getMidnightTonight() - now;
+  }
+  return midnight - now;
 }
+
+// Reset a completed repeating item — silent, no prompt
+function resetRepeatItem(item) {
+  return {
+    ...item,
+    completed: false,
+    needsCarryForward: false,
+    needsRefreshPrompt: false,
+    lastReviewed: new Date().toISOString(),
+    chunks: Array.isArray(item.chunks) ? item.chunks.map(c => ({ ...c, done: false })) : []
+  };
+}
+
+// Flag an incomplete repeating item for carry-forward prompt
+function flagForCarryForward(item) {
+  return { ...item, needsCarryForward: true, needsRefreshPrompt: false };
+}
+
+// Create a carried-forward copy of an item (non-repeating, date-tagged)
+function createCarryForwardCopy(item) {
+  const dateTag = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return {
+    ...item,
+    id: "hz_" + Date.now() + "_cf_" + Math.random().toString(36).substr(2, 4),
+    name: item.name + " (w/e " + dateTag + ")",
+    repeat: "none",
+    completed: false,
+    needsCarryForward: false,
+    needsRefreshPrompt: false,
+    lastCompletedAt: null,
+    createdAt: new Date().toISOString()
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Review cadence in days per radar tier
 const REVIEW_CADENCE = {
@@ -827,29 +916,34 @@ function App() {
   const [horizonItems, setHorizonItems] = useState(() => {
     const items = loadHorizon();
     if (!Array.isArray(items)) return [];
-    return items.map(i => {
+    const newItems = [];
+    items.forEach(i => {
       const item = {
         ...i,
         chunks: Array.isArray(i.chunks) ? i.chunks : [],
         completed: !!i.completed,
         repeat: i.repeat || "none",
         pulseFreq: i.pulseFreq || "medium",
-        autoRefresh: i.autoRefresh !== false, // default true for existing items
-        needsRefreshPrompt: !!i.needsRefreshPrompt,
+        autoRefresh: i.autoRefresh !== false,
+        needsCarryForward: !!i.needsCarryForward,
+        needsRefreshPrompt: false, // legacy — replaced by needsCarryForward
         lastCompletedAt: i.lastCompletedAt || null,
+        createdAt: i.createdAt || i.lastReviewed || new Date().toISOString(),
         lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
       };
-      // Handle repeating items whose cycle has elapsed
       if (shouldResetRepeat(item)) {
-        if (item.autoRefresh !== false) {
-          return resetRepeatItem(item);
+        if (item.completed) {
+          // Completed — silent auto-reset, no prompt
+          newItems.push(resetRepeatItem(item));
         } else {
-          // Flag for user prompt instead of auto-resetting
-          return { ...item, needsRefreshPrompt: true };
+          // Not completed — flag for carry-forward prompt (don't reset yet)
+          newItems.push(flagForCarryForward(item));
         }
+      } else {
+        newItems.push(item);
       }
-      return item;
     });
+    return newItems;
   });
 
   // --- Horizon Folders ---
@@ -1394,6 +1488,39 @@ function App() {
   const [hzPromoteSelection, setHzPromoteSelection] = useState(new Set()); // selected chunk IDs for selective promote
 
   useEffect(() => { saveHorizon(horizonItems); }, [horizonItems]);
+
+  // Live midnight reset timer — fires at next midnight, then re-schedules
+  useEffect(() => {
+    let timer;
+    const scheduleNextReset = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(0, 0, 0, 0);
+      midnight.setDate(midnight.getDate() + 1);
+      const msUntil = midnight - now;
+      timer = setTimeout(() => {
+        setHorizonItems(prev => {
+          const next = [];
+          const carryOvers = [];
+          prev.forEach(item => {
+            if (shouldResetRepeat(item)) {
+              if (item.completed) {
+                next.push(resetRepeatItem(item));
+              } else {
+                carryOvers.push(flagForCarryForward(item));
+              }
+            } else {
+              next.push(item);
+            }
+          });
+          return [...next, ...carryOvers];
+        });
+        scheduleNextReset(); // re-schedule for next midnight
+      }, msUntil);
+    };
+    scheduleNextReset();
+    return () => clearTimeout(timer);
+  }, []);
 
   const activeHzItems = horizonItems.filter(i => !i.completed);
   const completedHzItems = horizonItems.filter(i => i.completed);
@@ -4054,14 +4181,51 @@ update();
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                      {item.needsRefreshPrompt && (
-                        <button onClick={() => {
-                          setHorizonItems(prev => prev.map(i => i.id === item.id ? resetRepeatItem({ ...i, needsRefreshPrompt: false }) : i));
-                        }} style={{
-                          padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                          background: C.amber + "25", border: `2px solid ${C.amber}`,
-                          ...lbl, fontSize: 8, color: C.amber
-                        }}>🔄 READY TO REFRESH?</button>
+                      {item.needsCarryForward && (
+                        <div style={{
+                          width: "100%", background: C.amber + "12",
+                          border: `1px solid ${C.amber}44`, borderRadius: 6,
+                          padding: "10px 12px", marginBottom: 4
+                        }}>
+                          <div style={{ ...lbl, fontSize: 9, color: C.amber, marginBottom: 8 }}>
+                            ⚠ THIS WASN'T COMPLETED — WHAT DO YOU WANT TO DO?
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => {
+                              // Skip — dismiss old instance, fresh cycle starts clean
+                              setHorizonItems(prev => prev.map(i =>
+                                i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false }) : i
+                              ));
+                            }} style={{
+                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
+                              background: "transparent", border: `1px solid ${T.border}`,
+                              ...lbl, fontSize: 8, color: T.textMid
+                            }}>✕ SKIP</button>
+                            <button onClick={() => {
+                              // Complete — mark done retroactively, fresh cycle starts
+                              setHorizonItems(prev => prev.map(i =>
+                                i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false, lastCompletedAt: new Date().toISOString() }) : i
+                              ));
+                            }} style={{
+                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
+                              background: C.green + "15", border: `1px solid ${C.green}44`,
+                              ...lbl, fontSize: 8, color: C.green
+                            }}>✓ MARK COMPLETE</button>
+                            <button onClick={() => {
+                              // Carry forward — create dated copy, reset original for new cycle
+                              const copy = createCarryForwardCopy(item);
+                              const reset = resetRepeatItem({ ...item, needsCarryForward: false });
+                              setHorizonItems(prev => [
+                                ...prev.map(i => i.id === item.id ? reset : i),
+                                copy
+                              ]);
+                            }} style={{
+                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
+                              background: C.amber + "15", border: `1px solid ${C.amber}44`,
+                              ...lbl, fontSize: 8, color: C.amber
+                            }}>↩ CARRY FORWARD</button>
+                          </div>
+                        </div>
                       )}
                       <button onClick={() => {
                         if (item.type === "project" && item.chunks && item.chunks.filter(c => !c.done).length > 0) {
