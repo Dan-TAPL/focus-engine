@@ -5285,11 +5285,24 @@ async function _doCloudLoad() {
   const cloudData = await loadAllFromCloud();
 
   if (cloudData) {
+    let dataChanged = false;
     CLOUD_KEYS.forEach(k => {
       if (cloudData[k] !== undefined) {
-        localStorage.setItem(k, JSON.stringify(cloudData[k]));
+        const newVal = JSON.stringify(cloudData[k]);
+        if (localStorage.getItem(k) !== newVal) {
+          localStorage.setItem(k, newVal);
+          dataChanged = true;
+        }
       }
     });
+    // If cloud had data that differs from local, the React app hasn't seen it yet
+    // (React initialised from localStorage before we loaded cloud data).
+    // Store email for after reload, then reload so React starts fresh with cloud data.
+    if (dataChanged) {
+      sessionStorage.setItem('tapl-pending-email', currentEmail);
+      window.location.reload();
+      return; // reload is in progress
+    }
   } else {
     const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
     if (hasLocalData) {
@@ -5349,6 +5362,18 @@ function hideMsg(id) { document.getElementById(id).style.display = 'none'; }
 document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
+
+  // After a cloud-data reload, skip auth and boot straight into the app
+  const pendingEmail = sessionStorage.getItem('tapl-pending-email');
+  if (pendingEmail) {
+    sessionStorage.removeItem('tapl-pending-email');
+    currentEmail = pendingEmail;
+    window.__taplUserEmail = pendingEmail;
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    // Re-init Firebase so saves keep working
+    initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
+  }
 });
 </script>
 </body>
