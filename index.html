@@ -35,8 +35,15 @@
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:8px; vertical-align:middle; }
   @keyframes spin { to { transform:rotate(360deg); } }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
+
+<div id="cloud-loading" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#1A1035;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+  <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8453C;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
+</div>
 
 <div id="auth-screen">
   <div class="auth-card">
@@ -167,7 +174,77 @@ const RADAR = {
   someday: { label: "SOMEDAY — 60+ DAYS", color: C.green, bg: "rgba(34,197,94,0.12)", desc: "Far out, just keeping track" }
 };
 
-// localStorage helpers
+// ── TAPL Cloud Storage — Firebase Realtime Database ──────────────────────────
+// localStorage is kept as a fast local cache.
+// Firebase is the source of truth, keyed by user email hash.
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCncj_CNUVsKKI1wd9jH3ch0wG4F9XT1D8",
+  authDomain: "tapl---focus-engine.firebaseapp.com",
+  databaseURL: "https://tapl---focus-engine-default-rtdb.firebaseio.com",
+  projectId: "tapl---focus-engine",
+  storageBucket: "tapl---focus-engine.firebasestorage.app",
+  messagingSenderId: "664660859690",
+  appId: "1:664660859690:web:a6def7c9bb37470ecfdc53"
+};
+
+const CLOUD_KEYS = [
+  'tapl-tasks', 'tapl-blocks', 'tapl-session-start', 'tapl-session-end',
+  'tapl-horizon', 'tapl-hz-folders', 'tapl-completed-tasks',
+  'tapl-skipped-tasks', 'tapl-theme'
+];
+
+let _firebaseDb = null;
+let _userPath = null;
+let _saveTimer = null;
+let _cloudReady = false;
+
+function _initFirebase() {
+  if (_firebaseDb) return;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _firebaseDb = firebase.database();
+  } catch(e) { console.error('Firebase init failed:', e); }
+}
+
+// Hash email to a safe Firebase path key (avoids dots/@ in path)
+async function _hashEmail(email) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase().trim()));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 32);
+}
+
+async function initCloudForUser(email) {
+  _initFirebase();
+  const hash = await _hashEmail(email);
+  _userPath = 'users/' + hash;
+  _cloudReady = true;
+}
+
+// Load ALL user data from Firebase in one read. Returns object of key→value.
+async function loadAllFromCloud() {
+  if (!_cloudReady || !_firebaseDb) return null;
+  try {
+    const snap = await _firebaseDb.ref(_userPath + '/data').get();
+    return snap.exists() ? snap.val() : null;
+  } catch(e) { console.error('Cloud load failed:', e); return null; }
+}
+
+// Save ALL current localStorage keys to Firebase (debounced 2s)
+function scheduleSave() {
+  if (!_cloudReady || !_firebaseDb) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const payload = {};
+    CLOUD_KEYS.forEach(k => {
+      const raw = localStorage.getItem(k);
+      if (raw !== null) { try { payload[k] = JSON.parse(raw); } catch(e) {} }
+    });
+    _firebaseDb.ref(_userPath + '/data').set(payload)
+      .catch(e => console.error('Cloud save failed:', e));
+  }, 2000);
+}
+
+// localStorage helpers — write locally + schedule cloud sync
 function loadData(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -178,8 +255,10 @@ function loadData(key, fallback) {
 function saveData(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    scheduleSave();
   } catch(e) { console.error("Save failed:", e); }
 }
+// ─────────────────────────────────────────────────────────────────────────────
 // TAPL Focus Engine — Audio Module
 // Web Audio API tone generator for timer alerts
 
@@ -720,7 +799,13 @@ class ErrorBoundary extends React.Component {
       return React.createElement("div", { style: { padding: 40, color: "#E8453C", fontFamily: "monospace", background: "#1A1035", minHeight: "100vh" } },
         React.createElement("h2", null, "Something went wrong"),
         React.createElement("pre", { style: { color: "#fff", fontSize: 12, whiteSpace: "pre-wrap" } }, this.state.error.toString()),
-        React.createElement("button", { onClick: () => { localStorage.clear(); window.location.reload(); }, style: { marginTop: 20, padding: "10px 20px", background: "#E8453C", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" } }, "Clear Data & Reload")
+        React.createElement("button", { onClick: async () => { 
+  localStorage.clear(); 
+  if (window._firebaseDb && window._userPath) {
+    try { await window._firebaseDb.ref(window._userPath + '/data').remove(); } catch(e) {}
+  }
+  window.location.reload(); 
+}, style: { marginTop: 20, padding: "10px 20px", background: "#E8453C", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" } }, "Clear Data & Reload")
       );
     }
     return this.props.children;
@@ -974,6 +1059,14 @@ function App() {
       </div>
       {/* Right: export + theme toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {window.__taplUserEmail && (
+          <span style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontSize: 9, color: "rgba(255,255,255,0.4)",
+            letterSpacing: "0.5px", maxWidth: 160,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+          }}>{window.__taplUserEmail}</span>
+        )}
         <button onClick={() => exportAllCSV(tasks, horizonItems)} style={{
           background: "rgba(255,255,255,0.1)",
           border: "1px solid rgba(255,255,255,0.2)",
@@ -3259,54 +3352,6 @@ update();
             </div>
           </div>
         )}
-        {hzEditFolderModal && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300
-          }} onClick={() => setHzEditFolderModal(null)}>
-            <div onClick={e => e.stopPropagation()} style={{
-              background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
-              padding: 24, width: 360, maxWidth: "90vw"
-            }}>
-              <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>EDIT FOLDER</div>
-              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
-              <input value={hzEditFolderName} onChange={e => setHzEditFolderName(e.target.value)}
-                placeholder="Folder name..." autoFocus
-                onKeyDown={e => { if (e.key === "Enter") doSaveFolder(); }}
-                style={{
-                  width: "100%", padding: "10px", background: T.inputBg,
-                  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
-                  color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
-                  outline: "none", marginBottom: 16, boxSizing: "border-box"
-                }} />
-              <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
-              {colorSwatches(hzEditFolderColor, setHzEditFolderColor)}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-                borderRadius: 6, marginBottom: 16,
-                background: hzEditFolderColor + "15",
-                borderLeft: `5px solid ${hzEditFolderColor}`,
-                border: `1px solid ${hzEditFolderColor}33`
-              }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzEditFolderColor }} />
-                <span style={{ ...lbl, fontSize: 12, color: hzEditFolderColor }}>{hzEditFolderName || "Folder name"}</span>
-              </div>
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button onClick={() => setHzEditFolderModal(null)} style={{
-                  padding: "8px 16px", borderRadius: 6, cursor: "pointer",
-                  background: "transparent", border: `1px solid ${T.border}`,
-                  ...lbl, fontSize: 10, color: T.textMid
-                }}>CANCEL</button>
-                <button onClick={doSaveFolder} style={{
-                  padding: "8px 20px", borderRadius: 6, cursor: "pointer",
-                  background: hzEditFolderName.trim() ? hzEditFolderColor : T.border,
-                  border: "none", color: "#FFF", ...lbl, fontSize: 10,
-                  opacity: hzEditFolderName.trim() ? 1 : 0.5
-                }}>SAVE ✓</button>
-              </div>
-            </div>
-          </div>
-        )}
       </>
     );
 
@@ -4970,8 +5015,47 @@ async function verifyOTP() {
   } catch(e) { showMsg('otp-message','Something went wrong. Please try again.','error'); btn.disabled=false; btn.innerHTML='Verify & Enter →'; }
 }
 
-function showApp() {
+async function showApp() {
+  // Show loading overlay while we fetch cloud data
   document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('cloud-loading').style.display = 'flex';
+
+  // Initialise Firebase path for this user
+  await initCloudForUser(currentEmail);
+
+  // Load cloud data
+  const cloudData = await loadAllFromCloud();
+
+  if (cloudData) {
+    // Cloud data exists — hydrate localStorage from cloud (cloud wins)
+    CLOUD_KEYS.forEach(k => {
+      if (cloudData[k] !== undefined) {
+        localStorage.setItem(k, JSON.stringify(cloudData[k]));
+      }
+    });
+  } else {
+    // No cloud data yet — check if localStorage has existing data to migrate
+    const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
+    if (hasLocalData) {
+      // First login with existing local data — migrate it up immediately
+      const payload = {};
+      CLOUD_KEYS.forEach(k => {
+        const raw = localStorage.getItem(k);
+        if (raw !== null) { try { payload[k] = JSON.parse(raw); } catch(e) {} }
+      });
+      try {
+        await _firebaseDb.ref(_userPath + '/data').set(payload);
+        console.log('Local data migrated to cloud.');
+      } catch(e) { console.error('Migration failed:', e); }
+    }
+    // If no local data either — app starts with defaults (new user)
+  }
+
+  // Make email available to React app
+  window.__taplUserEmail = currentEmail;
+
+  // Hide loading, show app
+  document.getElementById('cloud-loading').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
 }
 
