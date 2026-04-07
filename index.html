@@ -616,7 +616,8 @@ function createCarryForwardCopy(item) {
     needsCarryForward: false,
     needsRefreshPrompt: false,
     lastCompletedAt: null,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    folderId: item.folderId || null  // preserve folder assignment, never leave as empty string
   };
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4181,52 +4182,6 @@ update();
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                      {item.needsCarryForward && (
-                        <div style={{
-                          width: "100%", background: C.amber + "12",
-                          border: `1px solid ${C.amber}44`, borderRadius: 6,
-                          padding: "10px 12px", marginBottom: 4
-                        }}>
-                          <div style={{ ...lbl, fontSize: 9, color: C.amber, marginBottom: 8 }}>
-                            ⚠ THIS WASN'T COMPLETED — WHAT DO YOU WANT TO DO?
-                          </div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            <button onClick={() => {
-                              // Skip — dismiss old instance, fresh cycle starts clean
-                              setHorizonItems(prev => prev.map(i =>
-                                i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false }) : i
-                              ));
-                            }} style={{
-                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
-                              background: "transparent", border: `1px solid ${T.border}`,
-                              ...lbl, fontSize: 8, color: T.textMid
-                            }}>✕ SKIP</button>
-                            <button onClick={() => {
-                              // Complete — mark done retroactively, fresh cycle starts
-                              setHorizonItems(prev => prev.map(i =>
-                                i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false, lastCompletedAt: new Date().toISOString() }) : i
-                              ));
-                            }} style={{
-                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
-                              background: C.green + "15", border: `1px solid ${C.green}44`,
-                              ...lbl, fontSize: 8, color: C.green
-                            }}>✓ MARK COMPLETE</button>
-                            <button onClick={() => {
-                              // Carry forward — create dated copy, reset original for new cycle
-                              const copy = createCarryForwardCopy(item);
-                              const reset = resetRepeatItem({ ...item, needsCarryForward: false });
-                              setHorizonItems(prev => [
-                                ...prev.map(i => i.id === item.id ? reset : i),
-                                copy
-                              ]);
-                            }} style={{
-                              padding: "5px 12px", borderRadius: 4, cursor: "pointer",
-                              background: C.amber + "15", border: `1px solid ${C.amber}44`,
-                              ...lbl, fontSize: 8, color: C.amber
-                            }}>↩ CARRY FORWARD</button>
-                          </div>
-                        </div>
-                      )}
                       <button onClick={() => {
                         if (item.type === "project" && item.chunks && item.chunks.filter(c => !c.done).length > 0) {
                           setHzPromoteModal(item.id);
@@ -4479,8 +4434,10 @@ update();
     // --- Dashboard ---
     const tiers = ["close", "mid", "long", "someday"];
     const hzProjects = activeHzItems.filter(i => i.type === "project");
-    const needsAttention = activeHzItems.filter(i => isOverdueForReview(i));
-    const pastDueItems = activeHzItems.filter(i => isPastDue(i));
+    const carryForwardItems = activeHzItems.filter(i => i.needsCarryForward);
+    const carryForwardIds = new Set(carryForwardItems.map(i => i.id));
+    const needsAttention = activeHzItems.filter(i => isOverdueForReview(i) && !carryForwardIds.has(i.id));
+    const pastDueItems = activeHzItems.filter(i => isPastDue(i) && !carryForwardIds.has(i.id));
 
     return (
       <div style={{ padding: "16px 12px", maxWidth: 900, margin: "0 auto" }}>
@@ -4580,6 +4537,87 @@ update();
             color: hzView === "folders" ? (dark ? "#FFFFFF" : C.purple) : T.textDim
           }}>📁 BY FOLDER</button>
         </div>
+
+        {/* ── INCOMPLETE REPEATING TASKS banner ── */}
+        {carryForwardItems.length > 0 && (
+          <div style={{
+            background: dark ? "rgba(232,69,60,0.08)" : "rgba(232,69,60,0.05)",
+            border: `2px solid ${C.red}44`,
+            borderLeft: `4px solid ${C.red}`,
+            borderRadius: 8, padding: "14px 16px", marginBottom: 16
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ ...lbl, fontSize: 11, color: C.red, letterSpacing: "2px" }}>
+                ↩ INCOMPLETE REPEATING TASKS
+              </span>
+              <span style={{
+                background: C.red, color: "#FFF", borderRadius: 10,
+                padding: "1px 8px", ...lbl, fontSize: 9
+              }}>{carryForwardItems.length}</span>
+            </div>
+            <div style={{ fontSize: 10, color: T.textDim, marginBottom: 12, fontFamily: "Montserrat, sans-serif" }}>
+              These tasks weren't completed before their reset deadline. Choose what to do with each one.
+            </div>
+            {carryForwardItems.map(item => (
+              <div key={item.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 12px", marginBottom: 6, borderRadius: 6,
+                background: T.card, border: `1px solid ${C.red}22`,
+                gap: 12, flexWrap: "wrap"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
+                    background: item.type === "project" ? C.purple : C.teal,
+                    color: "#FFF", flexShrink: 0
+                  }}>{item.type === "project" ? "PROJECT" : "TASK"}</span>
+                  {item.repeat && item.repeat !== "none" && (
+                    <span style={{
+                      padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
+                      background: C.amber + "20", color: C.amber, border: `1px solid ${C.amber}44`,
+                      flexShrink: 0
+                    }}>{item.repeat.toUpperCase()}</span>
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.name}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => {
+                    setHorizonItems(prev => prev.map(i =>
+                      i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false }) : i
+                    ));
+                  }} style={{
+                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    ...lbl, fontSize: 9, color: T.textMid
+                  }}>✕ SKIP</button>
+                  <button onClick={() => {
+                    setHorizonItems(prev => prev.map(i =>
+                      i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false, lastCompletedAt: new Date().toISOString() }) : i
+                    ));
+                  }} style={{
+                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
+                    background: C.green + "15", border: `1px solid ${C.green}44`,
+                    ...lbl, fontSize: 9, color: C.green
+                  }}>✓ COMPLETE</button>
+                  <button onClick={() => {
+                    const copy = createCarryForwardCopy(item);
+                    const reset = resetRepeatItem({ ...item, needsCarryForward: false });
+                    setHorizonItems(prev => [
+                      ...prev.map(i => i.id === item.id ? reset : i),
+                      copy
+                    ]);
+                  }} style={{
+                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
+                    background: C.red + "15", border: `1px solid ${C.red}44`,
+                    ...lbl, fontSize: 9, color: C.red
+                  }}>↩ CARRY FORWARD</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Pulse check banner */}
         {needsAttention.length > 0 && (
