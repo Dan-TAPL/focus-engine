@@ -1522,9 +1522,12 @@ function App() {
   const [hzEditFolderName, setHzEditFolderName] = useState("");
   const [hzEditFolderColor, setHzEditFolderColor] = useState("#8B5CF6");
   const [hzScreen, setHzScreen] = useState("dashboard"); // dashboard, capture, edit
-  const [collapsedTiers, setCollapsedTiers] = useState(new Set());
+  const [collapsedTiers, setCollapsedTiers] = useState(() => new Set(["close", "mid", "long", "someday"]));
   const [hzView, setHzView] = useState("timeline"); // "timeline" or "folders"
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState(new Set());
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState(() => {
+    const saved = loadData("tapl-hz-folders", []);
+    return new Set(Array.isArray(saved) ? saved.map(f => f.id) : []);
+  });
   const [ungroupedCollapsed, setUngroupedCollapsed] = useState(false);
   const [hzCaptureStep, setHzCaptureStep] = useState(0);
   const [hzCaptureData, setHzCaptureData] = useState({});
@@ -4833,17 +4836,19 @@ update();
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); startCaptureInFolder(folder.id); }} style={{
-                        width: 64, height: 24, borderRadius: 4, cursor: "pointer", flexShrink: 0,
+                        height: 24, borderRadius: 4, cursor: "pointer", flexShrink: 0,
+                        padding: isMobile ? "0 10px" : "0",
+                        width: isMobile ? "auto" : 64,
                         background: (folder.color || C.teal) + "20", border: `1px solid ${folder.color || C.teal}`,
                         fontSize: 9, color: folder.color || C.teal, ...lbl, display: "flex", alignItems: "center", justifyContent: "center"
                       }}>+ ITEM</button>
                       <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
                         {[
-                          { label: "↑", onClick: () => moveFolderUp(folder.id) },
-                          { label: "↓", onClick: () => moveFolderDown(folder.id) },
+                          !isMobile && { label: "↑", onClick: () => moveFolderUp(folder.id) },
+                          !isMobile && { label: "↓", onClick: () => moveFolderDown(folder.id) },
                           { label: "✎", onClick: () => { setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderModal(folder.id); } },
                           { label: "✕", onClick: () => { if (window.confirm('Delete folder? Items will be ungrouped.')) deleteFolder(folder.id); } },
-                        ].map(btn => (
+                        ].filter(Boolean).map(btn => (
                           <button key={btn.label} onClick={e => { e.stopPropagation(); btn.onClick(); }} style={{
                             width: 24, height: 24, borderRadius: 3, cursor: "pointer", flexShrink: 0,
                             background: "transparent", border: `1px solid ${T.border}`,
@@ -4852,9 +4857,11 @@ update();
                           }}>{btn.label}</button>
                         ))}
                       </div>
-                      <span style={{ ...lbl, fontSize: 9, color: T.textDim, width: 52, textAlign: "right", flexShrink: 0 }}>
-                        {folderItems.length} ITEM{folderItems.length !== 1 ? "S" : ""}
-                      </span>
+                      {!isMobile && (
+                        <span style={{ ...lbl, fontSize: 9, color: T.textDim, width: 52, textAlign: "right", flexShrink: 0 }}>
+                          {folderItems.length} ITEM{folderItems.length !== 1 ? "S" : ""}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {!fCollapsed && (
