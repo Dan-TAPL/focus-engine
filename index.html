@@ -5264,6 +5264,11 @@ async function verifyOTP() {
       document.getElementById('d0').focus();
       btn.disabled=false; btn.innerHTML='Verify & Enter →'; return;
     }
+    // Save token and expiry so user stays logged in across refreshes
+    const expiresIn = data.expires_in || 86400; // default 24h if not specified
+    localStorage.setItem('tapl-auth-token', data.access_token);
+    localStorage.setItem('tapl-auth-email', currentEmail);
+    localStorage.setItem('tapl-auth-expiry', Date.now() + (expiresIn * 1000));
     showApp();
   } catch(e) { showMsg('otp-message','Something went wrong. Please try again.','error'); btn.disabled=false; btn.innerHTML='Verify & Enter →'; }
 }
@@ -5332,6 +5337,13 @@ function backToEmail() {
   showScreen('screen-email');
 }
 
+function signOut() {
+  localStorage.removeItem('tapl-auth-token');
+  localStorage.removeItem('tapl-auth-email');
+  localStorage.removeItem('tapl-auth-expiry');
+  window.location.reload();
+}
+
 function otpInput(el, idx) {
   el.value = el.value.replace(/[^0-9]/g,'');
   if (el.value && idx < 5) document.getElementById('d'+(idx+1)).focus();
@@ -5380,7 +5392,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('app-container').style.display = 'block';
     // Re-init Firebase so saves keep working
     initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
+    return;
   }
+
+  // Check for a valid saved session — skip OTP if token exists and hasn't expired
+  const savedToken = localStorage.getItem('tapl-auth-token');
+  const savedEmail = localStorage.getItem('tapl-auth-email');
+  const savedExpiry = localStorage.getItem('tapl-auth-expiry');
+  if (savedToken && savedEmail && savedExpiry && Date.now() < parseInt(savedExpiry)) {
+    currentEmail = savedEmail;
+    showApp();
+    return;
+  }
+
+  // No valid session — clear any stale auth data and show login
+  localStorage.removeItem('tapl-auth-token');
+  localStorage.removeItem('tapl-auth-email');
+  localStorage.removeItem('tapl-auth-expiry');
 });
 </script>
 </body>
