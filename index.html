@@ -3478,20 +3478,30 @@ update();
   const [hzSendName, setHzSendName] = useState("");
   const [hzSendExisting, setHzSendExisting] = useState("");
   const [hzSelectMode, setHzSelectMode] = useState(false); // bulk select mode
-  const [hzSelected, setHzSelected] = useState(new Set()); // selected item IDs
+  const [hzSelected, setHzSelected] = useState(new Set()); // selected item/folder IDs
+  const [hzSelectedTabs, setHzSelectedTabs] = useState(new Set()); // selected tab IDs
 
   const toggleHzSelect = (id) => setHzSelected(prev => {
     const next = new Set([...prev]);
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-  const exitHzSelectMode = () => { setHzSelectMode(false); setHzSelected(new Set()); };
+  const exitHzSelectMode = () => { setHzSelectMode(false); setHzSelected(new Set()); setHzSelectedTabs(new Set()); };
   const bulkDeleteHzItems = () => {
     if (hzSelected.size === 0) return;
     if (confirm(`Delete ${hzSelected.size} item${hzSelected.size !== 1 ? "s" : ""}? This cannot be undone.`)) {
       const selectedFolderIds = hzSelected;
       setHorizonItems(prev => prev.filter(i => !hzSelected.has(i.id)).map(i => selectedFolderIds.has(i.folderId) ? { ...i, folderId: null } : i));
       setHzFolders(prev => prev.filter(f => !hzSelected.has(f.id)));
+      exitHzSelectMode();
+    }
+  };
+  const bulkDeleteTabs = () => {
+    if (hzSelectedTabs.size === 0) return;
+    if (confirm(`Delete ${hzSelectedTabs.size} tab${hzSelectedTabs.size !== 1 ? "s" : ""}? Folders in these tabs will become unassigned.`)) {
+      setHzTabs(prev => prev.filter(t => !hzSelectedTabs.has(t.id)));
+      setHzFolders(prev => prev.map(f => hzSelectedTabs.has(f.tabId) ? { ...f, tabId: null } : f));
+      if (hzSelectedTabs.has(hzActiveTab)) setHzActiveTab("all");
       exitHzSelectMode();
     }
   };
@@ -4691,14 +4701,14 @@ update();
               {/* Tab strip */}
               <div style={{
                 display: "flex", alignItems: "flex-end", gap: 3, flexWrap: "nowrap",
-                overflowX: "auto", borderBottom: `2px solid ${activeColor}`,
+                overflowX: "hidden", borderBottom: `2px solid ${activeColor}`,
                 paddingBottom: 0, marginBottom: 16
               }}>
-                {/* ALL tab */}
+                {/* ALL tab — not selectable, always present */}
                 {(() => {
                   const isActive = hzActiveTab === "all";
                   return (
-                    <button onClick={() => setHzActiveTab("all")} style={{
+                    <button onClick={() => { if (!hzSelectMode) setHzActiveTab("all"); }} style={{
                       padding: "9px 12px 10px", cursor: "pointer", flex: 1, minWidth: 0,
                       background: isActive ? (dark ? "#1A1635" : "#FFFFFF") : (dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"),
                       border: `2px solid ${isActive ? C.teal : T.border}`,
@@ -4715,19 +4725,42 @@ update();
                 {/* User tabs */}
                 {hzTabs.map(tab => {
                   const isActive = hzActiveTab === tab.id;
+                  const isTabSelected = hzSelectedTabs.has(tab.id);
                   return (
-                    <button key={tab.id} onClick={() => setHzActiveTab(tab.id)} style={{
+                    <button key={tab.id} onClick={() => {
+                      if (hzSelectMode) {
+                        setHzSelectedTabs(prev => {
+                          const next = new Set([...prev]);
+                          next.has(tab.id) ? next.delete(tab.id) : next.add(tab.id);
+                          return next;
+                        });
+                      } else {
+                        setHzActiveTab(tab.id);
+                      }
+                    }} style={{
                       padding: "9px 12px 10px", cursor: "pointer", flex: 1, minWidth: 0,
-                      background: isActive ? (dark ? "#1A1635" : "#FFFFFF") : (dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"),
-                      border: `2px solid ${isActive ? tab.color : T.border}`,
-                      borderBottom: isActive ? `2px solid ${dark ? "#1A1635" : "#FFFFFF"}` : `2px solid ${T.border}`,
+                      background: isTabSelected ? tab.color + "30" : isActive ? (dark ? "#1A1635" : "#FFFFFF") : (dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"),
+                      border: `2px solid ${isTabSelected ? tab.color : isActive ? tab.color : T.border}`,
+                      borderBottom: isActive && !isTabSelected ? `2px solid ${dark ? "#1A1635" : "#FFFFFF"}` : `2px solid ${isTabSelected ? tab.color : T.border}`,
                       borderRadius: "8px 8px 0 0",
                       ...lbl, fontSize: 10, letterSpacing: "1.5px",
-                      color: isActive ? tab.color : T.textDim,
-                      marginBottom: isActive ? -2 : 0,
-                      boxShadow: isActive ? `0 -2px 8px ${tab.color}25` : "none",
-                      transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                    }}>{tab.name.toUpperCase()}</button>
+                      color: isTabSelected ? tab.color : isActive ? tab.color : T.textDim,
+                      marginBottom: isActive && !isTabSelected ? -2 : 0,
+                      boxShadow: isActive && !isTabSelected ? `0 -2px 8px ${tab.color}25` : "none",
+                      transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      position: "relative"
+                    }}>
+                      {hzSelectMode && (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 12, height: 12, borderRadius: 3, marginRight: 5, flexShrink: 0,
+                          background: isTabSelected ? tab.color : "transparent",
+                          border: `2px solid ${isTabSelected ? tab.color : T.textDim}`,
+                          verticalAlign: "middle"
+                        }}>{isTabSelected && <span style={{ color: "#FFF", fontSize: 8, fontWeight: 900, lineHeight: 1 }}>✓</span>}</span>
+                      )}
+                      {tab.name.toUpperCase()}
+                    </button>
                   );
                 })}
                 {/* Add tab button — fixed width, doesn't stretch */}
@@ -5525,8 +5558,8 @@ update();
           </div>
         )}
 
-        {/* Bulk select action bar — sticky at bottom, only visible when items selected */}
-        {hzSelectMode && hzSelected.size > 0 && (
+        {/* Bulk select action bar — sticky at bottom, visible when folders or tabs are selected */}
+        {hzSelectMode && (hzSelected.size > 0 || hzSelectedTabs.size > 0) && (
           <div style={{
             position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
             background: T.card, border: `2px solid ${C.purple}`,
@@ -5535,9 +5568,9 @@ update();
             boxShadow: "0 4px 24px rgba(0,0,0,0.4)", zIndex: 300
           }}>
             <span style={{ ...lbl, fontSize: 11, color: T.text }}>
-              {hzSelected.size} SELECTED
+              {[hzSelected.size > 0 && `${hzSelected.size} folder${hzSelected.size !== 1 ? "s" : ""}`, hzSelectedTabs.size > 0 && `${hzSelectedTabs.size} tab${hzSelectedTabs.size !== 1 ? "s" : ""}`].filter(Boolean).join(" + ")} SELECTED
             </span>
-            {hzTabs.length > 0 && (
+            {hzSelected.size > 0 && hzTabs.length > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>MOVE TO TAB:</span>
                 <select onChange={e => { if (e.target.value !== "") bulkAssignToTab(e.target.value); e.target.value = ""; }}
@@ -5553,10 +5586,18 @@ update();
                 </select>
               </div>
             )}
-            <button onClick={bulkDeleteHzItems} style={{
-              background: C.red, color: "#FFF", border: "none", borderRadius: 6,
-              padding: "8px 20px", cursor: "pointer", ...lbl, fontSize: 10, letterSpacing: "1px"
-            }}>✕ DELETE</button>
+            {hzSelected.size > 0 && (
+              <button onClick={bulkDeleteHzItems} style={{
+                background: C.red, color: "#FFF", border: "none", borderRadius: 6,
+                padding: "8px 20px", cursor: "pointer", ...lbl, fontSize: 10, letterSpacing: "1px"
+              }}>✕ DELETE FOLDERS</button>
+            )}
+            {hzSelectedTabs.size > 0 && (
+              <button onClick={bulkDeleteTabs} style={{
+                background: C.red, color: "#FFF", border: "none", borderRadius: 6,
+                padding: "8px 20px", cursor: "pointer", ...lbl, fontSize: 10, letterSpacing: "1px"
+              }}>✕ DELETE TABS</button>
+            )}
             <button onClick={exitHzSelectMode} style={{
               background: "transparent", color: T.textMid, border: `1px solid ${T.border}`,
               borderRadius: 6, padding: "8px 14px", cursor: "pointer", ...lbl, fontSize: 10
