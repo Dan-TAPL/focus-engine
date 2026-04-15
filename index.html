@@ -34,6 +34,10 @@
   .auth-footer { font-family:'Montserrat',sans-serif; font-size:10px; color:#4A3F6B; margin-top:24px; letter-spacing:1px; }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:8px; vertical-align:middle; }
   @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes slideInRight { from { transform:translateX(60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  @keyframes slideInLeft  { from { transform:translateX(-60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  .carousel-slide-right { animation: slideInRight 0.22s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+  .carousel-slide-left  { animation: slideInLeft  0.22s cubic-bezier(0.25,0.46,0.45,0.94) both; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -44,6 +48,20 @@
   <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8453C;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
+
+<script>
+// Runs synchronously before React — hides auth screen instantly on post-login reload
+// so there is no flash of the login screen before JS can hide it.
+(function() {
+  var pending = sessionStorage.getItem('tapl-pending-email');
+  var token = localStorage.getItem('tapl-auth-token');
+  var expiry = localStorage.getItem('tapl-auth-expiry');
+  var validSession = token && expiry && Date.now() < parseInt(expiry);
+  if (pending || validSession) {
+    document.write('<style>#auth-screen{display:none!important}</style>');
+  }
+})();
+</script>
 
 <div id="auth-screen">
   <div class="auth-card">
@@ -190,7 +208,7 @@ const FIREBASE_CONFIG = {
 
 const CLOUD_KEYS = [
   'tapl-tasks', 'tapl-blocks', 'tapl-session-start', 'tapl-session-end',
-  'tapl-horizon', 'tapl-hz-folders', 'tapl-completed-tasks',
+  'tapl-horizon', 'tapl-hz-folders', 'tapl-hz-tabs', 'tapl-completed-tasks',
   'tapl-skipped-tasks', 'tapl-theme'
 ];
 
@@ -963,6 +981,28 @@ function App() {
   });
   useEffect(() => { saveData("tapl-hz-folders", hzFolders); }, [hzFolders]);
 
+  // --- Horizon Tabs ---
+  const [hzTabs, setHzTabs] = useState(() => {
+    const saved = loadData("tapl-hz-tabs", []);
+    return Array.isArray(saved) ? saved : [];
+  });
+  useEffect(() => { saveData("tapl-hz-tabs", hzTabs); }, [hzTabs]);
+
+  const TAB_COLORS = ["#8B5CF6","#0891B2","#22C55E","#F59E0B","#EC4899","#14B8A6","#F97316","#6366F1","#E8453C","#84CC16"];
+  const addTab = (name, color) => {
+    const id = "tab_" + Date.now();
+    const tabColor = color || TAB_COLORS[hzTabs.length % TAB_COLORS.length];
+    setHzTabs(prev => [...prev, { id, name, color: tabColor }]);
+    return id;
+  };
+  const renameTab = (id, name) => setHzTabs(prev => prev.map(t => t.id === id ? { ...t, name } : t));
+  const updateTabColor = (id, color) => setHzTabs(prev => prev.map(t => t.id === id ? { ...t, color } : t));
+  const deleteTab = (id) => {
+    setHzTabs(prev => prev.filter(t => t.id !== id));
+    // Unassign folders from this tab
+    setHzFolders(prev => prev.map(f => f.tabId === id ? { ...f, tabId: null } : f));
+  };
+
   const FOLDER_COLORS = ["#8B5CF6","#E8453C","#0891B2","#22C55E","#F59E0B","#EC4899","#14B8A6","#F97316","#6366F1","#84CC16"];
   const addFolder = (name, color) => {
     const id = "folder_" + Date.now();
@@ -1517,13 +1557,58 @@ function App() {
   const [hzNewFolderModal, setHzNewFolderModal] = useState(false);
   const [hzNewFolderName, setHzNewFolderName] = useState("");
   const [hzNewFolderColor, setHzNewFolderColor] = useState("#8B5CF6");
+  const [hzNewFolderTabId, setHzNewFolderTabId] = useState("");
   const hzNewFolderCallbackRef = useRef(null);
   const [hzEditFolderModal, setHzEditFolderModal] = useState(null); // folder id
   const [hzEditFolderName, setHzEditFolderName] = useState("");
   const [hzEditFolderColor, setHzEditFolderColor] = useState("#8B5CF6");
+  const [hzEditFolderTabId, setHzEditFolderTabId] = useState("");
   const [hzScreen, setHzScreen] = useState("dashboard"); // dashboard, capture, edit
   const [collapsedTiers, setCollapsedTiers] = useState(() => new Set(["close", "mid", "long", "someday"]));
   const [hzView, setHzView] = useState("timeline"); // "timeline" or "folders"
+  const [hzActiveTab, setHzActiveTab] = useState("all"); // "all" or a tab id
+  const [hzTabModal, setHzTabModal] = useState(false); // manage tabs modal
+  const [hzNewTabName, setHzNewTabName] = useState("");
+  const [hzNewTabColor, setHzNewTabColor] = useState("#8B5CF6");
+  const [hzEditTabModal, setHzEditTabModal] = useState(null); // tab id being edited
+  const [hzEditTabName, setHzEditTabName] = useState("");
+  const [hzEditTabColor, setHzEditTabColor] = useState("#8B5CF6");
+  const [recurringCarouselIdx, setRecurringCarouselIdx] = useState(0);
+  const [recurringFilterTab, setRecurringFilterTab] = useState("all");
+  const [recurringSlideDir, setRecurringSlideDir] = useState("right");
+  const [pulseCarouselIdx, setPulseCarouselIdx] = useState(0);
+  const [pulseFilterTab, setPulseFilterTab] = useState("all");
+  const [pulseSlideDir, setPulseSlideDir] = useState("right");
+  const [overdueFilterTab, setOverdueFilterTab] = useState("all");
+  const [hzCompletedCollapsed, setHzCompletedCollapsed] = useState(true);
+
+  // When the active tab changes, sync all three alert filters to match
+  useEffect(() => {
+    setRecurringFilterTab(hzActiveTab);
+    setRecurringCarouselIdx(0);
+    setPulseFilterTab(hzActiveTab);
+    setPulseCarouselIdx(0);
+    setOverdueFilterTab(hzActiveTab);
+  }, [hzActiveTab]);
+  const [hzAlertScrolledPast, setHzAlertScrolledPast] = useState(false);
+
+  // Floating sidebar scroll detection — only active in Horizon mode
+  useEffect(() => {
+    if (!horizonMode) { setHzAlertScrolledPast(false); return; }
+    const handleScroll = () => {
+      const recurring = document.getElementById("hz-recurring-carousel");
+      const pulse = document.getElementById("hz-pulse-carousel");
+      const overdue = document.getElementById("hz-overdue");
+      // Use the last visible alert section as the sentinel
+      const sentinel = overdue || pulse || recurring;
+      if (!sentinel) { setHzAlertScrolledPast(false); return; }
+      const rect = sentinel.getBoundingClientRect();
+      setHzAlertScrolledPast(rect.bottom < 60); // 60px = below header
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // check on mount
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [horizonMode]);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState(() => {
     const saved = loadData("tapl-hz-folders", []);
     return new Set(Array.isArray(saved) ? saved.map(f => f.id) : []);
@@ -3424,6 +3509,11 @@ update();
       exitHzSelectMode();
     }
   };
+  const bulkAssignToTab = (tabId) => {
+    // Assign selected folders to the chosen tab; items are not directly tab-assigned (tabs work via folders)
+    setHzFolders(prev => prev.map(f => hzSelected.has(f.id) ? { ...f, tabId: tabId || null } : f));
+    exitHzSelectMode();
+  };
 
   const startCapture = () => {
     setHzCaptureData({ type: "task", name: "", dueDate: "", dateConfirmed: true, size: "S", repeat: "none", pulseFreq: "medium", folderId: "", notes: "", chunks: [] });
@@ -3467,13 +3557,18 @@ update();
     const doCreateFolder = () => {
       if (!hzNewFolderName.trim()) return;
       const id = addFolder(hzNewFolderName.trim(), hzNewFolderColor);
+      if (hzNewFolderTabId) {
+        setHzFolders(prev => prev.map(f => f.id === id ? { ...f, tabId: hzNewFolderTabId } : f));
+      }
       if (hzNewFolderCallbackRef.current) { hzNewFolderCallbackRef.current(id); hzNewFolderCallbackRef.current = null; }
       setHzNewFolderModal(false);
+      setHzNewFolderTabId("");
     };
     const doSaveFolder = () => {
       if (!hzEditFolderName.trim()) return;
       renameFolder(hzEditFolderModal, hzEditFolderName.trim());
       updateFolderColor(hzEditFolderModal, hzEditFolderColor);
+      setHzFolders(prev => prev.map(f => f.id === hzEditFolderModal ? { ...f, tabId: hzEditFolderTabId || null } : f));
       setHzEditFolderModal(null);
     };
     const colorSwatches = (selectedColor, onSelect) => (
@@ -3511,6 +3606,20 @@ update();
                 }} />
               <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
               {colorSwatches(hzNewFolderColor, setHzNewFolderColor)}
+              {hzTabs.length > 0 && (
+                <>
+                  <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>ASSIGN TO TAB</div>
+                  <select value={hzNewFolderTabId} onChange={e => setHzNewFolderTabId(e.target.value)} style={{
+                    width: "100%", padding: "10px", background: T.inputBg,
+                    border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                    color: T.text, fontSize: 12, fontFamily: "'Montserrat', sans-serif",
+                    outline: "none", marginBottom: 16, boxSizing: "border-box"
+                  }}>
+                    <option value="">— No tab (show in All only) —</option>
+                    {hzTabs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </>
+              )}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setHzNewFolderModal(false)} style={{
                   padding: "8px 16px", borderRadius: 6, cursor: "pointer",
@@ -4486,6 +4595,15 @@ update();
     const needsAttention = activeHzItems.filter(i => isOverdueForReview(i) && !carryForwardIds.has(i.id));
     const pastDueItems = activeHzItems.filter(i => isPastDue(i) && !carryForwardIds.has(i.id));
 
+    // Tab filtering — folders belonging to active tab, items within those folders
+    const tabFilteredFolders = hzActiveTab === "all"
+      ? hzFolders
+      : hzFolders.filter(f => f.tabId === hzActiveTab);
+    const tabFilteredFolderIds = new Set(tabFilteredFolders.map(f => f.id));
+    const tabFilteredItems = hzActiveTab === "all"
+      ? activeHzItems
+      : activeHzItems.filter(i => i.folderId && tabFilteredFolderIds.has(i.folderId));
+
     return (
       <div style={{ padding: "16px 12px", maxWidth: 900, margin: "0 auto" }}>
         {folderModals}
@@ -4522,6 +4640,20 @@ update();
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: hzEditFolderColor }} />
                 <span style={{ ...lbl, fontSize: 12, color: hzEditFolderColor }}>{hzEditFolderName || "Folder name"}</span>
               </div>
+              {hzTabs.length > 0 && (
+                <>
+                  <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>ASSIGN TO TAB</div>
+                  <select value={hzEditFolderTabId} onChange={e => setHzEditFolderTabId(e.target.value)} style={{
+                    width: "100%", padding: "10px", background: T.inputBg,
+                    border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                    color: T.text, fontSize: 12, fontFamily: "'Montserrat', sans-serif",
+                    outline: "none", marginBottom: 16, boxSizing: "border-box"
+                  }}>
+                    <option value="">— No tab (show in All only) —</option>
+                    {hzTabs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </>
+              )}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setHzEditFolderModal(null)} style={{
                   padding: "8px 16px", borderRadius: 6, cursor: "pointer",
@@ -4564,6 +4696,230 @@ update();
           </div>
         </div>
 
+        {/* ── TAB BAR ── */}
+        {(() => {
+          const activeTabObj = hzTabs.find(t => t.id === hzActiveTab);
+          const activeColor = activeTabObj ? activeTabObj.color : C.teal;
+          return (
+            <div style={{ marginBottom: 0 }}>
+              {/* Tab strip */}
+              <div style={{
+                display: "flex", alignItems: "flex-end", gap: 3, flexWrap: "nowrap",
+                overflowX: "auto", borderBottom: `2px solid ${activeColor}`,
+                paddingBottom: 0, marginBottom: 16
+              }}>
+                {/* ALL tab */}
+                {(() => {
+                  const isActive = hzActiveTab === "all";
+                  return (
+                    <button onClick={() => setHzActiveTab("all")} style={{
+                      padding: "9px 12px 10px", cursor: "pointer", flex: 1, minWidth: 0,
+                      background: isActive ? (dark ? "#1A1635" : "#FFFFFF") : (dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"),
+                      border: `2px solid ${isActive ? C.teal : T.border}`,
+                      borderBottom: isActive ? `2px solid ${dark ? "#1A1635" : "#FFFFFF"}` : `2px solid ${T.border}`,
+                      borderRadius: "8px 8px 0 0",
+                      ...lbl, fontSize: 10, letterSpacing: "1.5px",
+                      color: isActive ? C.teal : T.textDim,
+                      marginBottom: isActive ? -2 : 0,
+                      boxShadow: isActive ? (dark ? "0 -2px 8px rgba(11,191,191,0.15)" : "0 -2px 8px rgba(11,191,191,0.12)") : "none",
+                      transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                    }}>ALL</button>
+                  );
+                })()}
+                {/* User tabs */}
+                {hzTabs.map(tab => {
+                  const isActive = hzActiveTab === tab.id;
+                  return (
+                    <button key={tab.id} onClick={() => setHzActiveTab(tab.id)} style={{
+                      padding: "9px 12px 10px", cursor: "pointer", flex: 1, minWidth: 0,
+                      background: isActive ? (dark ? "#1A1635" : "#FFFFFF") : (dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"),
+                      border: `2px solid ${isActive ? tab.color : T.border}`,
+                      borderBottom: isActive ? `2px solid ${dark ? "#1A1635" : "#FFFFFF"}` : `2px solid ${T.border}`,
+                      borderRadius: "8px 8px 0 0",
+                      ...lbl, fontSize: 10, letterSpacing: "1.5px",
+                      color: isActive ? tab.color : T.textDim,
+                      marginBottom: isActive ? -2 : 0,
+                      boxShadow: isActive ? `0 -2px 8px ${tab.color}25` : "none",
+                      transition: "all 0.15s", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                    }}>{tab.name.toUpperCase()}</button>
+                  );
+                })}
+                {/* Add tab button — fixed width, doesn't stretch */}
+                <button onClick={() => setHzTabModal(true)} style={{
+                  padding: "9px 14px 10px", cursor: "pointer", flexShrink: 0,
+                  background: "transparent",
+                  border: `2px dashed ${T.border}`, borderBottom: `2px dashed ${T.border}`,
+                  borderRadius: "8px 8px 0 0",
+                  ...lbl, fontSize: 9, letterSpacing: "1px", color: T.textFaint,
+                  transition: "all 0.15s"
+                }}>+ TAB</button>
+              </div>
+              {/* Active tab label */}
+              {hzActiveTab !== "all" && activeTabObj && (
+                <div style={{ marginTop: -10, marginBottom: 14, fontSize: 10, color: activeTabObj.color, fontFamily: "Montserrat, sans-serif", fontWeight: 700, letterSpacing: "1px" }}>
+                  {activeTabObj.name} — {tabFilteredItems.length} item{tabFilteredItems.length !== 1 ? "s" : ""}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── MANAGE TABS MODAL ── */}
+        {hzTabModal && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400
+          }} onClick={() => setHzTabModal(false)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+              padding: 24, width: 420, maxWidth: "90vw", maxHeight: "80vh", overflowY: "auto"
+            }}>
+              <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>MANAGE TABS</div>
+
+              {/* Existing tabs */}
+              {hzTabs.length === 0 && (
+                <div style={{ fontSize: 12, color: T.textDim, marginBottom: 16, fontFamily: "Montserrat, sans-serif" }}>No tabs yet. Create your first tab below.</div>
+              )}
+              {hzTabs.map(tab => (
+                <div key={tab.id} style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+                  borderRadius: 8, marginBottom: 8,
+                  background: tab.color + "12", border: `1px solid ${tab.color}33`,
+                  borderLeft: `4px solid ${tab.color}`
+                }}>
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: T.text, fontFamily: "Montserrat, sans-serif" }}>{tab.name}</span>
+                  <span style={{ fontSize: 10, color: T.textDim, fontFamily: "Montserrat, sans-serif" }}>
+                    {hzFolders.filter(f => f.tabId === tab.id).length} folder{hzFolders.filter(f => f.tabId === tab.id).length !== 1 ? "s" : ""}
+                  </span>
+                  <button onClick={() => {
+                    setHzEditTabModal(tab.id);
+                    setHzEditTabName(tab.name);
+                    setHzEditTabColor(tab.color);
+                    setHzTabModal(false);
+                  }} style={{
+                    padding: "4px 10px", borderRadius: 4, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    ...lbl, fontSize: 8, color: T.textMid
+                  }}>EDIT</button>
+                  <button onClick={() => {
+                    if (confirm(`Delete tab "${tab.name}"? Folders in this tab will become unassigned.`)) {
+                      deleteTab(tab.id);
+                      if (hzActiveTab === tab.id) setHzActiveTab("all");
+                    }
+                  }} style={{
+                    padding: "4px 10px", borderRadius: 4, cursor: "pointer",
+                    background: C.red + "15", border: `1px solid ${C.red}44`,
+                    ...lbl, fontSize: 8, color: C.red
+                  }}>✕</button>
+                </div>
+              ))}
+
+              {/* New tab form */}
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, marginTop: 8 }}>
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NEW TAB NAME</div>
+                <input value={hzNewTabName} onChange={e => setHzNewTabName(e.target.value)}
+                  placeholder="e.g. Day Job, Personal, Freelance..."
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && hzNewTabName.trim()) {
+                      addTab(hzNewTabName.trim(), hzNewTabColor);
+                      setHzNewTabName("");
+                    }
+                  }}
+                  style={{
+                    width: "100%", padding: "10px", background: T.inputBg,
+                    border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                    color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                    outline: "none", marginBottom: 12, boxSizing: "border-box"
+                  }} />
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {["#8B5CF6","#0891B2","#22C55E","#F59E0B","#EC4899","#14B8A6","#F97316","#6366F1","#E8453C","#84CC16"].map(c => (
+                    <div key={c} onClick={() => setHzNewTabColor(c)} style={{
+                      width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
+                      border: hzNewTabColor === c ? `3px solid ${T.text}` : "3px solid transparent",
+                      boxSizing: "border-box"
+                    }} />
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button onClick={() => setHzTabModal(false)} style={{
+                    padding: "8px 16px", borderRadius: 6, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    ...lbl, fontSize: 10, color: T.textMid
+                  }}>CLOSE</button>
+                  <button onClick={() => {
+                    if (hzNewTabName.trim()) {
+                      addTab(hzNewTabName.trim(), hzNewTabColor);
+                      setHzNewTabName("");
+                    }
+                  }} style={{
+                    padding: "8px 20px", borderRadius: 6, cursor: "pointer",
+                    background: hzNewTabName.trim() ? hzNewTabColor : T.border,
+                    border: "none", color: "#FFF", ...lbl, fontSize: 10,
+                    opacity: hzNewTabName.trim() ? 1 : 0.5
+                  }}>CREATE TAB ✓</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── EDIT TAB MODAL ── */}
+        {hzEditTabModal && (() => {
+          const doSaveTab = () => {
+            if (hzEditTabName.trim()) {
+              renameTab(hzEditTabModal, hzEditTabName.trim());
+              updateTabColor(hzEditTabModal, hzEditTabColor);
+              setHzEditTabModal(null);
+            }
+          };
+          return (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400
+            }} onClick={() => setHzEditTabModal(null)}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
+                padding: 24, width: 360, maxWidth: "90vw"
+              }}>
+                <div style={{ ...lbl, fontSize: 13, color: T.text, marginBottom: 16 }}>EDIT TAB</div>
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 6 }}>NAME</div>
+                <input value={hzEditTabName} onChange={e => setHzEditTabName(e.target.value)}
+                  autoFocus onKeyDown={e => { if (e.key === "Enter") doSaveTab(); }}
+                  style={{
+                    width: "100%", padding: "10px", background: T.inputBg,
+                    border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+                    color: T.text, fontSize: 13, fontFamily: "'Montserrat', sans-serif",
+                    outline: "none", marginBottom: 16, boxSizing: "border-box"
+                  }} />
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginBottom: 8 }}>COLOUR</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {["#8B5CF6","#0891B2","#22C55E","#F59E0B","#EC4899","#14B8A6","#F97316","#6366F1","#E8453C","#84CC16"].map(c => (
+                    <div key={c} onClick={() => setHzEditTabColor(c)} style={{
+                      width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
+                      border: hzEditTabColor === c ? `3px solid ${T.text}` : "3px solid transparent",
+                      boxSizing: "border-box"
+                    }} />
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button onClick={() => setHzEditTabModal(null)} style={{
+                    padding: "8px 16px", borderRadius: 6, cursor: "pointer",
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    ...lbl, fontSize: 10, color: T.textMid
+                  }}>CANCEL</button>
+                  <button onClick={doSaveTab} style={{
+                    padding: "8px 20px", borderRadius: 6, cursor: "pointer",
+                    background: hzEditTabName.trim() ? hzEditTabColor : T.border,
+                    border: "none", color: "#FFF", ...lbl, fontSize: 10,
+                    opacity: hzEditTabName.trim() ? 1 : 0.5
+                  }}>SAVE ✓</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
           <button onClick={() => setHzView("timeline")} style={{
             flex: 1, padding: "10px 16px", cursor: "pointer",
@@ -4585,192 +4941,272 @@ update();
           }}>📁 BY FOLDER</button>
         </div>
 
-        {/* ── INCOMPLETE REPEATING TASKS banner ── */}
-        {carryForwardItems.length > 0 && (
-          <div style={{
-            background: dark ? "rgba(232,69,60,0.08)" : "rgba(232,69,60,0.05)",
-            border: `2px solid ${C.red}44`,
-            borderLeft: `4px solid ${C.red}`,
-            borderRadius: 8, padding: "14px 16px", marginBottom: 16
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ ...lbl, fontSize: 11, color: C.red, letterSpacing: "2px" }}>
-                ↩ INCOMPLETE REPEATING TASKS
-              </span>
-              <span style={{
-                background: C.red, color: "#FFF", borderRadius: 10,
-                padding: "1px 8px", ...lbl, fontSize: 9
-              }}>{carryForwardItems.length}</span>
-            </div>
-            <div style={{ fontSize: 10, color: T.textDim, marginBottom: 12, fontFamily: "Montserrat, sans-serif" }}>
-              These tasks weren't completed before their reset deadline. Choose what to do with each one.
-            </div>
-            {carryForwardItems.map(item => (
-              <div key={item.id} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "10px 12px", marginBottom: 6, borderRadius: 6,
-                background: T.card, border: `1px solid ${C.red}22`,
-                gap: 12, flexWrap: "wrap"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
-                    background: item.type === "project" ? C.purple : C.teal,
-                    color: "#FFF", flexShrink: 0
-                  }}>{item.type === "project" ? "PROJECT" : "TASK"}</span>
-                  {item.repeat && item.repeat !== "none" && (
-                    <span style={{
-                      padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
-                      background: C.amber + "20", color: C.amber, border: `1px solid ${C.amber}44`,
-                      flexShrink: 0
-                    }}>{item.repeat.toUpperCase()}</span>
-                  )}
-                  <span style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.name}
-                  </span>
+        {/* ── INCOMPLETE REPEATING TASKS — carousel ── */}
+        {carryForwardItems.length > 0 && (() => {
+          const getItemTab = (item) => {
+            const folder = hzFolders.find(f => f.id === item.folderId);
+            return folder ? (folder.tabId || "none") : "none";
+          };
+          const filteredRecurring = recurringFilterTab === "all"
+            ? carryForwardItems
+            : carryForwardItems.filter(i => getItemTab(i) === recurringFilterTab);
+          const rIdx = Math.min(recurringCarouselIdx, Math.max(0, filteredRecurring.length - 1));
+          const item = filteredRecurring[rIdx];
+          const advanceRecurring = () => {
+            if (filteredRecurring.length <= 1) { setRecurringCarouselIdx(0); return; }
+            setRecurringSlideDir("right");
+            setRecurringCarouselIdx(prev => prev >= filteredRecurring.length - 1 ? 0 : prev + 1);
+          };
+          return (
+            <div id="hz-recurring-carousel" style={{
+              background: dark ? "rgba(232,69,60,0.11)" : "rgba(232,69,60,0.07)",
+              border: `2px solid ${C.red}66`, borderLeft: `5px solid ${C.red}`,
+              borderRadius: 10, padding: "16px 18px", marginBottom: 16,
+              boxShadow: dark ? "0 4px 20px rgba(232,69,60,0.18), 0 1px 4px rgba(0,0,0,0.4)" : "0 4px 16px rgba(232,69,60,0.14), 0 1px 4px rgba(0,0,0,0.08)",
+              marginLeft: -4, marginRight: -4
+            }}>
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ ...lbl, fontSize: 11, color: C.red, letterSpacing: "2px" }}>↩ INCOMPLETE REPEATING</span>
+                  <span style={{ background: C.red, color: "#FFF", borderRadius: 10, padding: "1px 8px", ...lbl, fontSize: 9 }}>{carryForwardItems.length}</span>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => {
-                    setHorizonItems(prev => prev.map(i =>
-                      i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false }) : i
-                    ));
-                  }} style={{
-                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
-                    background: "transparent", border: `1px solid ${T.border}`,
-                    ...lbl, fontSize: 9, color: T.textMid
-                  }}>✕ SKIP</button>
-                  <button onClick={() => {
-                    setHorizonItems(prev => prev.map(i =>
-                      i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false, lastCompletedAt: new Date().toISOString() }) : i
-                    ));
-                  }} style={{
-                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
-                    background: C.green + "15", border: `1px solid ${C.green}44`,
-                    ...lbl, fontSize: 9, color: C.green
-                  }}>✓ COMPLETE</button>
-                  <button onClick={() => {
-                    const copy = createCarryForwardCopy(item);
-                    const reset = resetRepeatItem({ ...item, needsCarryForward: false });
-                    setHorizonItems(prev => [
-                      ...prev.map(i => i.id === item.id ? reset : i),
-                      copy
-                    ]);
-                  }} style={{
-                    padding: "6px 14px", borderRadius: 4, cursor: "pointer",
-                    background: C.red + "15", border: `1px solid ${C.red}44`,
-                    ...lbl, fontSize: 9, color: C.red
-                  }}>↩ CARRY FORWARD</button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {hzTabs.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, background: dark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.06)", borderRadius: 6, padding: "3px" }}>
+                      {[{ id: "all", name: "ALL", color: C.red }, ...hzTabs.map(t => ({ id: t.id, name: t.name, color: t.color }))].map(opt => {
+                        const isActive = recurringFilterTab === opt.id;
+                        return (
+                          <button key={opt.id} onClick={() => { setRecurringFilterTab(opt.id); setRecurringCarouselIdx(0); }} style={{
+                            padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                            background: isActive ? opt.color : "transparent",
+                            border: "none",
+                            ...lbl, fontSize: 8, letterSpacing: "1px",
+                            color: isActive ? "#FFF" : T.textDim,
+                            transition: "all 0.12s"
+                          }}>{opt.name.toUpperCase()}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {filteredRecurring.length > 0 && (
+                    <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>{rIdx + 1} / {filteredRecurring.length}</span>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* Pulse check banner */}
-        {needsAttention.length > 0 && (
-          <div style={{
-            background: C.amber + "12", border: `1px solid ${C.amber}33`, borderRadius: 8,
-            padding: "12px 16px", marginBottom: 16
-          }}>
-            <div style={{ ...lbl, fontSize: 10, color: C.amber, marginBottom: 10 }}>
-              ⚠ PULSE CHECK — {needsAttention.length} ITEM{needsAttention.length !== 1 ? "S" : ""} NEED YOUR ATTENTION
+              {filteredRecurring.length === 0 ? (
+                <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif", padding: "8px 0" }}>No incomplete recurring tasks in this tab.</div>
+              ) : (
+                <>
+                  {/* Card */}
+                  <div key={`recurring-${rIdx}`} className={`carousel-slide-${recurringSlideDir}`} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "12px 14px", borderRadius: 6,
+                    background: T.card, border: `1px solid ${C.red}22`, gap: 12, flexWrap: "wrap",
+                    overflow: "hidden"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <span style={{ padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7, background: item.type === "project" ? C.purple : C.teal, color: "#FFF", flexShrink: 0 }}>
+                        {item.type === "project" ? "PROJECT" : "TASK"}
+                      </span>
+                      {item.repeat && item.repeat !== "none" && (
+                        <span style={{ padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7, background: C.amber + "20", color: C.amber, border: `1px solid ${C.amber}44`, flexShrink: 0 }}>
+                          {item.repeat.toUpperCase()}
+                        </span>
+                      )}
+                      <span style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => { setHorizonItems(prev => prev.map(i => i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false }) : i)); advanceRecurring(); }} style={{ padding: "6px 14px", borderRadius: 4, cursor: "pointer", background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 9, color: T.textMid }}>✕ SKIP</button>
+                      <button onClick={() => { setHorizonItems(prev => prev.map(i => i.id === item.id ? resetRepeatItem({ ...i, needsCarryForward: false, lastCompletedAt: new Date().toISOString() }) : i)); advanceRecurring(); }} style={{ padding: "6px 14px", borderRadius: 4, cursor: "pointer", background: C.green + "15", border: `1px solid ${C.green}44`, ...lbl, fontSize: 9, color: C.green }}>✓ COMPLETE</button>
+                      <button onClick={() => { const copy = createCarryForwardCopy(item); const reset = resetRepeatItem({ ...item, needsCarryForward: false }); setHorizonItems(prev => [...prev.map(i => i.id === item.id ? reset : i), copy]); advanceRecurring(); }} style={{ padding: "6px 14px", borderRadius: 4, cursor: "pointer", background: C.red + "15", border: `1px solid ${C.red}44`, ...lbl, fontSize: 9, color: C.red }}>↩ CARRY FORWARD</button>
+                    </div>
+                  </div>
+                  {/* Nav arrows */}
+                  {filteredRecurring.length > 1 && (
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginTop: 10 }}>
+                      <button onClick={() => { setRecurringSlideDir("left"); setRecurringCarouselIdx(prev => prev <= 0 ? filteredRecurring.length - 1 : prev - 1); }} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textMid, cursor: "pointer", padding: "4px 12px", fontSize: 14 }}>‹</button>
+                      <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>{rIdx + 1} of {filteredRecurring.length}{recurringFilterTab !== "all" ? ` in this tab · ${carryForwardItems.length} total` : ""}</span>
+                      <button onClick={advanceRecurring} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textMid, cursor: "pointer", padding: "4px 12px", fontSize: 14 }}>›</button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            {needsAttention.map(item => {
-              const esc = getEscalationLevel(item);
-              const escColor = esc >= 2 ? C.red : C.amber;
-              const days = daysSinceReview(item);
-              return (
+          );
+        })()}
+
+        {/* ── PULSE CHECK — carousel ── */}
+        {needsAttention.length > 0 && (() => {
+          const getItemTab = (item) => {
+            const folder = hzFolders.find(f => f.id === item.folderId);
+            return folder ? (folder.tabId || "none") : "none";
+          };
+          const filteredPulse = pulseFilterTab === "all"
+            ? needsAttention
+            : needsAttention.filter(i => getItemTab(i) === pulseFilterTab);
+          const pIdx = Math.min(pulseCarouselIdx, Math.max(0, filteredPulse.length - 1));
+          const item = filteredPulse[pIdx];
+          const advancePulse = () => {
+            if (filteredPulse.length <= 1) { setPulseCarouselIdx(0); return; }
+            setPulseSlideDir("right");
+            setPulseCarouselIdx(prev => prev >= filteredPulse.length - 1 ? 0 : prev + 1);
+          };
+          return (
+            <div id="hz-pulse-carousel" style={{
+              background: dark ? "rgba(240,180,41,0.10)" : "rgba(240,180,41,0.08)",
+              border: `2px solid ${C.amber}55`, borderLeft: `5px solid ${C.amber}`,
+              borderRadius: 10, padding: "14px 18px", marginBottom: 16,
+              boxShadow: dark ? "0 4px 20px rgba(240,180,41,0.15), 0 1px 4px rgba(0,0,0,0.4)" : "0 4px 16px rgba(240,180,41,0.12), 0 1px 4px rgba(0,0,0,0.08)",
+              marginLeft: -4, marginRight: -4
+            }}>
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ ...lbl, fontSize: 11, color: C.amber, letterSpacing: "2px" }}>⚠ PULSE CHECK</span>
+                  <span style={{ background: C.amber, color: "#FFF", borderRadius: 10, padding: "1px 8px", ...lbl, fontSize: 9 }}>{needsAttention.length}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {hzTabs.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, background: dark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.06)", borderRadius: 6, padding: "3px" }}>
+                      {[{ id: "all", name: "ALL", color: C.amber }, ...hzTabs.map(t => ({ id: t.id, name: t.name, color: t.color }))].map(opt => {
+                        const isActive = pulseFilterTab === opt.id;
+                        return (
+                          <button key={opt.id} onClick={() => { setPulseFilterTab(opt.id); setPulseCarouselIdx(0); }} style={{
+                            padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                            background: isActive ? opt.color : "transparent",
+                            border: "none",
+                            ...lbl, fontSize: 8, letterSpacing: "1px",
+                            color: isActive ? "#FFF" : T.textDim,
+                            transition: "all 0.12s"
+                          }}>{opt.name.toUpperCase()}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {filteredPulse.length > 0 && (
+                    <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>{pIdx + 1} / {filteredPulse.length}</span>
+                  )}
+                </div>
+              </div>
+
+              {filteredPulse.length === 0 ? (
+                <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif", padding: "8px 0" }}>No pulse checks due in this tab.</div>
+              ) : (() => {
+                const esc = getEscalationLevel(item);
+                const escColor = esc >= 2 ? C.red : C.amber;
+                const days = daysSinceReview(item);
+                return (
+                  <>
+                    {/* Card */}
+                    <div key={`pulse-${pIdx}`} className={`carousel-slide-${pulseSlideDir}`} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 12px", borderRadius: 6,
+                      background: T.card, border: `1px solid ${escColor}33`, gap: 8, flexWrap: "wrap",
+                      overflow: "hidden"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                        <span style={{ position: "relative", flexShrink: 0 }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7, background: item.type === "project" ? C.purple : C.teal, color: "#FFF", border: dark ? `1px solid rgba(255,255,255,0.3)` : "none", display: "inline-block" }}>
+                            {item.type === "project" ? "P" : "T"}
+                          </span>
+                          {(() => { const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1); return outstanding > 0 ? (<span style={{ position: "absolute", top: -5, right: -7, width: 14, height: 14, borderRadius: "50%", background: C.red, color: "#FFF", fontSize: 8, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{outstanding}</span>) : null; })()}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                        <span style={{ ...lbl, fontSize: 8, color: escColor, flexShrink: 0 }}>{days}d since last check</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => { markReviewed(item.id); advancePulse(); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.green + "15", border: `1px solid ${C.green}44`, ...lbl, fontSize: 8, color: C.green }}>✓ ON TRACK</button>
+                        <button onClick={() => { setHzEditId(item.id); setHzCaptureData({ type: item.type, name: item.name, dueDate: item.dueDate || "", dateConfirmed: item.dateConfirmed !== false, size: item.size || "S", repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "", notes: item.notes || "", chunks: item.chunks ? item.chunks.map(c => c.name) : [] }); setHzCaptureStep(1); setHzScreen("edit"); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.amber + "15", border: `1px solid ${C.amber}44`, ...lbl, fontSize: 8, color: C.amber }}>✎ UPDATE</button>
+                      </div>
+                    </div>
+                    {/* Nav arrows */}
+                    {filteredPulse.length > 1 && (
+                      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginTop: 10 }}>
+                        <button onClick={() => { setPulseSlideDir("left"); setPulseCarouselIdx(prev => prev <= 0 ? filteredPulse.length - 1 : prev - 1); }} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textMid, cursor: "pointer", padding: "4px 12px", fontSize: 14 }}>‹</button>
+                        <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>{pIdx + 1} of {filteredPulse.length}{pulseFilterTab !== "all" ? ` in this tab · ${needsAttention.length} total` : ""}</span>
+                        <button onClick={advancePulse} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textMid, cursor: "pointer", padding: "4px 12px", fontSize: 14 }}>›</button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          );
+        })()}
+
+        {/* ── OVERDUE — fixed list with tab filter ── */}
+        {pastDueItems.length > 0 && (() => {
+          const getItemTab = (item) => {
+            const folder = hzFolders.find(f => f.id === item.folderId);
+            return folder ? (folder.tabId || "none") : "none";
+          };
+          const filteredOverdue = overdueFilterTab === "all"
+            ? pastDueItems
+            : pastDueItems.filter(i => getItemTab(i) === overdueFilterTab);
+          return (
+            <div id="hz-overdue" style={{
+              background: dark ? "rgba(232,69,60,0.11)" : "rgba(232,69,60,0.07)",
+              border: `2px solid ${C.red}66`, borderLeft: `5px solid ${C.red}`,
+              borderRadius: 10, padding: "14px 18px", marginBottom: 16,
+              boxShadow: dark ? "0 4px 20px rgba(232,69,60,0.18), 0 1px 4px rgba(0,0,0,0.4)" : "0 4px 16px rgba(232,69,60,0.14), 0 1px 4px rgba(0,0,0,0.08)",
+              marginLeft: -4, marginRight: -4
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ ...lbl, fontSize: 10, color: C.red }}>⚠ OVERDUE</span>
+                  <span style={{ background: C.red, color: "#FFF", borderRadius: 10, padding: "1px 8px", ...lbl, fontSize: 9 }}>{pastDueItems.length}</span>
+                </div>
+                {hzTabs.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 3, background: dark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.06)", borderRadius: 6, padding: "3px" }}>
+                    {[{ id: "all", name: "ALL", color: C.red }, ...hzTabs.map(t => ({ id: t.id, name: t.name, color: t.color }))].map(opt => {
+                      const isActive = overdueFilterTab === opt.id;
+                      return (
+                        <button key={opt.id} onClick={() => setOverdueFilterTab(opt.id)} style={{
+                          padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                          background: isActive ? opt.color : "transparent",
+                          border: "none",
+                          ...lbl, fontSize: 8, letterSpacing: "1px",
+                          color: isActive ? "#FFF" : T.textDim,
+                          transition: "all 0.12s"
+                        }}>{opt.name.toUpperCase()}</button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {filteredOverdue.length === 0 ? (
+                <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif" }}>No overdue items in this tab.</div>
+              ) : filteredOverdue.map(item => (
                 <div key={item.id} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 10px", marginBottom: 4, borderRadius: 6,
-                  background: T.card, border: `1px solid ${escColor}33`
+                  padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text,
+                  borderRadius: 4, background: dark ? "rgba(232,69,60,0.06)" : "transparent"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                    <span style={{ position: "relative", flexShrink: 0 }}>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 4, ...lbl, fontSize: 7,
-                        background: item.type === "project" ? C.purple : C.teal, color: "#FFF",
-                        border: dark ? `1px solid rgba(255,255,255,0.3)` : "none",
-                        display: "inline-block"
-                      }}>{item.type === "project" ? "P" : "T"}</span>
-                      {(() => {
-                        const outstanding = item.type === "project" && item.chunks ? item.chunks.filter(c => !c.done).length : (item.completed ? 0 : 1);
-                        return outstanding > 0 ? (
-                          <span style={{
-                            position: "absolute", top: -5, right: -7,
-                            width: 14, height: 14, borderRadius: "50%",
-                            background: C.red, color: "#FFF",
-                            fontSize: 8, fontWeight: 900,
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                          }}>{outstanding}</span>
-                        ) : null;
-                      })()}
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.name}
-                    </span>
-                    <span style={{ ...lbl, fontSize: 8, color: escColor, flexShrink: 0 }}>
-                      {days}d since last check
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                    <button onClick={() => markReviewed(item.id)} style={{
-                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                      background: C.green + "15", border: `1px solid ${C.green}44`,
-                      ...lbl, fontSize: 8, color: C.green
-                    }}>✓ ON TRACK</button>
-                    <button onClick={() => {
-                      setHzEditId(item.id);
-                      setHzCaptureData({
-                        type: item.type, name: item.name, dueDate: item.dueDate || "",
-                        dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                        repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
-                        notes: item.notes || "",
-                        chunks: item.chunks ? item.chunks.map(c => c.name) : []
-                      });
-                      setHzCaptureStep(1);
-                      setHzScreen("edit");
-                    }} style={{
-                      padding: "4px 10px", borderRadius: 4, cursor: "pointer",
-                      background: C.amber + "15", border: `1px solid ${C.amber}44`,
-                      ...lbl, fontSize: 8, color: C.amber
-                    }}>✎ UPDATE</button>
-                  </div>
+                  <span style={{ fontWeight: 700 }}>{item.name}</span>
+                  <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Past due warning */}
-        {pastDueItems.length > 0 && (
-          <div style={{
-            background: C.red + "12", border: `1px solid ${C.red}33`, borderRadius: 8,
-            padding: "12px 16px", marginBottom: 16
-          }}>
-            <div style={{ ...lbl, fontSize: 10, color: C.red, marginBottom: 8 }}>
-              ⚠ OVERDUE — {pastDueItems.length} ITEM{pastDueItems.length !== 1 ? "S" : ""} PAST DUE DATE
+              ))}
+              {overdueFilterTab !== "all" && filteredOverdue.length < pastDueItems.length && (
+                <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginTop: 8 }}>{pastDueItems.length - filteredOverdue.length} more overdue item{pastDueItems.length - filteredOverdue.length !== 1 ? "s" : ""} in other tabs</div>
+              )}
             </div>
-            {pastDueItems.map(item => (
-              <div key={item.id} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text
-              }}>
-                <span style={{ fontWeight: 700 }}>{item.name}</span>
-                <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
-              </div>
-            ))}
-          </div>
-        )}
+          );
+        })()}
 
         {/* === FOLDERS VIEW === */}
         {hzView === "folders" && (
           <div>
-            {hzFolders.length === 0 ? (
+            {tabFilteredFolders.length === 0 ? (
               <div style={{ textAlign: "center", padding: 40, color: T.textDim }}>
-                <div style={{ fontSize: 13 }}>No folders yet. Create one with + FOLDER above.</div>
+                <div style={{ fontSize: 13 }}>
+                  {hzActiveTab === "all"
+                    ? "No folders yet. Create one with + FOLDER above."
+                    : "No folders assigned to this tab yet. Edit a folder to assign it."}
+                </div>
               </div>
-            ) : hzFolders.map(folder => {
+            ) : tabFilteredFolders.map(folder => {
               const folderItems = activeHzItems.filter(i => i.folderId === folder.id);
               const overdueCount = folderItems.filter(i => isPastDue(i)).length;
               const needsReviewCount = folderItems.filter(i => isOverdueForReview(i)).length;
@@ -4846,7 +5282,7 @@ update();
                         {[
                           !isMobile && { label: "↑", onClick: () => moveFolderUp(folder.id) },
                           !isMobile && { label: "↓", onClick: () => moveFolderDown(folder.id) },
-                          { label: "✎", onClick: () => { setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderModal(folder.id); } },
+                          { label: "✎", onClick: () => { setHzEditFolderName(folder.name); setHzEditFolderColor(folder.color || "#8B5CF6"); setHzEditFolderTabId(folder.tabId || ""); setHzEditFolderModal(folder.id); } },
                           { label: "✕", onClick: () => { if (window.confirm('Delete folder? Items will be ungrouped.')) deleteFolder(folder.id); } },
                         ].filter(Boolean).map(btn => (
                           <button key={btn.label} onClick={e => { e.stopPropagation(); btn.onClick(); }} style={{
@@ -4879,7 +5315,7 @@ update();
             })}
             {/* Ungrouped items */}
             {(() => {
-              const ungrouped = activeHzItems.filter(i => !i.folderId || !hzFolders.find(f => f.id === i.folderId));
+              const ungrouped = tabFilteredItems.filter(i => !i.folderId || !hzFolders.find(f => f.id === i.folderId));
               if (ungrouped.length === 0) return null;
               return (
                 <div style={{ marginTop: 12 }}>
@@ -4913,14 +5349,16 @@ update();
         )}
 
         {/* === TIMELINE VIEW === */}
-        {hzView === "timeline" && (activeHzItems.length === 0 ? (
+        {hzView === "timeline" && (tabFilteredItems.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: T.textDim }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>◎</div>
-            <div style={{ fontSize: 13 }}>Nothing on the horizon yet.</div>
+            <div style={{ fontSize: 13 }}>
+              {hzActiveTab === "all" ? "Nothing on the horizon yet." : "No items in this tab yet."}
+            </div>
           </div>
         ) : tiers.map(tierId => {
           const tier = TIER_DISPLAY[tierId];
-          const tierItems = activeHzItems.filter(item => getRadarTier(item.dueDate) === tierId);
+          const tierItems = tabFilteredItems.filter(item => getRadarTier(item.dueDate) === tierId);
           if (tierItems.length === 0) return null;
           const tierCollapsed = collapsedTiers.has(tierId);
           const ungroupedItems = tierItems.filter(i => !i.folderId || !hzFolders.find(f => f.id === i.folderId));
@@ -5051,26 +5489,53 @@ update();
 
         {completedHzItems.length > 0 && (
           <div style={{ marginTop: 24 }}>
-            <div style={{ ...lbl, fontSize: 10, color: T.textDim, marginBottom: 8 }}>COMPLETED ({completedHzItems.length})</div>
-            {completedHzItems.map(item => (
-              <div key={item.id} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 12px", background: T.card, border: `1px solid ${T.border}`,
-                borderRadius: 6, marginBottom: 4, opacity: 0.5
-              }}>
-                <span style={{ fontSize: 12, color: T.textDim, textDecoration: "line-through" }}>{item.name}</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={() => uncompleteHorizonItem(item.id)} style={{
-                    padding: "2px 8px", borderRadius: 3, cursor: "pointer",
-                    background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 7, color: T.textDim
-                  }}>UNDO</button>
-                  <button onClick={() => deleteHorizonItem(item.id)} style={{
-                    padding: "2px 8px", borderRadius: 3, cursor: "pointer",
-                    background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 7, color: T.textDim
-                  }}>✕</button>
-                </div>
+            <div onClick={() => setHzCompletedCollapsed(prev => !prev)} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 14px", borderRadius: hzCompletedCollapsed ? 8 : "8px 8px 0 0",
+              cursor: "pointer",
+              background: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
+              border: `1px solid ${T.border}`,
+              borderBottom: hzCompletedCollapsed ? `1px solid ${T.border}` : `1px solid ${T.border}`,
+              userSelect: "none"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: T.textDim }}>{hzCompletedCollapsed ? "▶" : "▼"}</span>
+                <span style={{ ...lbl, fontSize: 10, color: T.textDim, letterSpacing: "2px" }}>COMPLETED</span>
+                <span style={{
+                  background: T.border, color: T.textDim, borderRadius: 10,
+                  padding: "1px 8px", ...lbl, fontSize: 9
+                }}>{completedHzItems.length}</span>
               </div>
-            ))}
+              <span style={{ ...lbl, fontSize: 8, color: T.textFaint }}>
+                {hzCompletedCollapsed ? "SHOW" : "HIDE"}
+              </span>
+            </div>
+            {!hzCompletedCollapsed && (
+              <div style={{
+                border: `1px solid ${T.border}`, borderTop: "none",
+                borderRadius: "0 0 8px 8px", overflow: "hidden"
+              }}>
+                {completedHzItems.map(item => (
+                  <div key={item.id} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "8px 12px", background: T.card,
+                    borderBottom: `1px solid ${T.border}`, opacity: 0.5
+                  }}>
+                    <span style={{ fontSize: 12, color: T.textDim, textDecoration: "line-through" }}>{item.name}</span>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => uncompleteHorizonItem(item.id)} style={{
+                        padding: "2px 8px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 7, color: T.textDim
+                      }}>UNDO</button>
+                      <button onClick={() => deleteHorizonItem(item.id)} style={{
+                        padding: "2px 8px", borderRadius: 3, cursor: "pointer",
+                        background: "transparent", border: `1px solid ${T.border}`, ...lbl, fontSize: 7, color: T.textDim
+                      }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -5078,14 +5543,30 @@ update();
         {hzSelectMode && hzSelected.size > 0 && (
           <div style={{
             position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-            background: T.card, border: `2px solid ${C.red}`,
+            background: T.card, border: `2px solid ${C.purple}`,
             borderRadius: 10, padding: "12px 20px",
-            display: "flex", alignItems: "center", gap: 16,
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
             boxShadow: "0 4px 24px rgba(0,0,0,0.4)", zIndex: 300
           }}>
             <span style={{ ...lbl, fontSize: 11, color: T.text }}>
               {hzSelected.size} SELECTED
             </span>
+            {hzTabs.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ ...lbl, fontSize: 9, color: T.textDim }}>MOVE TO TAB:</span>
+                <select onChange={e => { if (e.target.value !== "") bulkAssignToTab(e.target.value); e.target.value = ""; }}
+                  defaultValue=""
+                  style={{
+                    background: T.inputBg, border: `1px solid ${C.purple}`, borderRadius: 6,
+                    color: T.text, fontSize: 11, fontFamily: "Montserrat, sans-serif",
+                    padding: "6px 10px", outline: "none", cursor: "pointer"
+                  }}>
+                  <option value="" disabled>Select tab...</option>
+                  <option value="none">— Remove from tab</option>
+                  {hzTabs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
             <button onClick={bulkDeleteHzItems} style={{
               background: C.red, color: "#FFF", border: "none", borderRadius: 6,
               padding: "8px 20px", cursor: "pointer", ...lbl, fontSize: 10, letterSpacing: "1px"
@@ -5204,6 +5685,90 @@ update();
               ? renderBuildBlocks()
               : renderRunSession()
       }
+
+      {/* ── FLOATING HORIZON SIDEBAR ── */}
+      {horizonMode && hzAlertScrolledPast && (() => {
+        const activeHzForSidebar = horizonItems ? horizonItems.filter(i => !i.completed) : [];
+        const recurringCount = activeHzForSidebar.filter(i => i.needsCarryForward).length;
+        const pulseCount = activeHzForSidebar.filter(i => isOverdueForReview(i) && !i.needsCarryForward).length;
+        const overdueCount = activeHzForSidebar.filter(i => isPastDue(i) && !i.needsCarryForward).length;
+        const scrollToAlert = (id) => {
+          const el = document.getElementById(id);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+        const isMobileView = window.innerWidth < 768;
+        const sidebarStyle = isMobileView ? {
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
+          background: dark ? "#13102A" : "#FFFFFF",
+          borderTop: `1px solid ${T.border}`,
+          display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center",
+          padding: "8px 16px", gap: 8
+        } : {
+          position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)", zIndex: 200,
+          background: dark ? "#13102A" : "#FFFFFF",
+          border: `1px solid ${T.border}`, borderRadius: 12,
+          display: "flex", flexDirection: "column", alignItems: "center",
+          padding: "10px 6px", gap: 6, boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
+        };
+        const btnStyle = (color, count) => ({
+          position: "relative", width: 36, height: 36, borderRadius: 8,
+          background: count > 0 ? color + "20" : "transparent",
+          border: `1px solid ${count > 0 ? color + "66" : T.border}`,
+          cursor: count > 0 ? "pointer" : "default",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 15, flexShrink: 0
+        });
+        const badgeStyle = (color) => ({
+          position: "absolute", top: -4, right: -4,
+          minWidth: 14, height: 14, borderRadius: 7,
+          background: color, color: "#FFF",
+          fontSize: 8, fontWeight: 900,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "0 3px", fontFamily: "Montserrat, sans-serif"
+        });
+        const dividerStyle = isMobileView
+          ? { width: 1, height: 24, background: T.border, flexShrink: 0 }
+          : { width: 24, height: 1, background: T.border, flexShrink: 0 };
+        return (
+          <div style={sidebarStyle}>
+            {/* Recurring */}
+            <div style={btnStyle(C.red, recurringCount)} onClick={() => recurringCount > 0 && scrollToAlert("hz-recurring-carousel")} title="Incomplete Recurring">
+              <span>↩</span>
+              {recurringCount > 0 && <span style={badgeStyle(C.red)}>{recurringCount}</span>}
+            </div>
+            {/* Pulse */}
+            <div style={btnStyle(C.amber, pulseCount)} onClick={() => pulseCount > 0 && scrollToAlert("hz-pulse-carousel")} title="Pulse Check">
+              <span>⚠</span>
+              {pulseCount > 0 && <span style={badgeStyle(C.amber)}>{pulseCount}</span>}
+            </div>
+            {/* Overdue */}
+            <div style={btnStyle(C.red, overdueCount)} onClick={() => overdueCount > 0 && scrollToAlert("hz-overdue")} title="Overdue">
+              <span>🔴</span>
+              {overdueCount > 0 && <span style={badgeStyle(C.red)}>{overdueCount}</span>}
+            </div>
+            <div style={dividerStyle} />
+            {/* Tab switchers */}
+            <div onClick={() => { setHzActiveTab("all"); window.scrollTo({ top: 0, behavior: "smooth" }); }} title="All tabs"
+              style={{ ...btnStyle(C.teal, 1), background: hzActiveTab === "all" ? C.teal + "30" : "transparent", border: `1px solid ${hzActiveTab === "all" ? C.teal : T.border}` }}>
+              <span style={{ fontSize: 10, fontWeight: 900, fontFamily: "Montserrat, sans-serif", color: hzActiveTab === "all" ? C.teal : T.textDim }}>ALL</span>
+            </div>
+            {hzTabs.map(tab => (
+              <div key={tab.id}
+                onClick={() => { setHzActiveTab(tab.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                title={tab.name}
+                style={{
+                  ...btnStyle(tab.color, 1),
+                  background: hzActiveTab === tab.id ? tab.color + "30" : "transparent",
+                  border: `1px solid ${hzActiveTab === tab.id ? tab.color : T.border}`
+                }}>
+                <span style={{ fontSize: 9, fontWeight: 900, fontFamily: "Montserrat, sans-serif", color: hzActiveTab === tab.id ? tab.color : T.textDim, maxWidth: 28, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {tab.name.slice(0, 3).toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -5264,11 +5829,6 @@ async function verifyOTP() {
       document.getElementById('d0').focus();
       btn.disabled=false; btn.innerHTML='Verify & Enter →'; return;
     }
-    // Save token and expiry so user stays logged in across refreshes
-    const expiresIn = data.expires_in || 86400; // default 24h if not specified
-    localStorage.setItem('tapl-auth-token', data.access_token);
-    localStorage.setItem('tapl-auth-email', currentEmail);
-    localStorage.setItem('tapl-auth-expiry', Date.now() + (expiresIn * 1000));
     showApp();
   } catch(e) { showMsg('otp-message','Something went wrong. Please try again.','error'); btn.disabled=false; btn.innerHTML='Verify & Enter →'; }
 }
@@ -5337,13 +5897,6 @@ function backToEmail() {
   showScreen('screen-email');
 }
 
-function signOut() {
-  localStorage.removeItem('tapl-auth-token');
-  localStorage.removeItem('tapl-auth-email');
-  localStorage.removeItem('tapl-auth-expiry');
-  window.location.reload();
-}
-
 function otpInput(el, idx) {
   el.value = el.value.replace(/[^0-9]/g,'');
   if (el.value && idx < 5) document.getElementById('d'+(idx+1)).focus();
@@ -5392,23 +5945,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('app-container').style.display = 'block';
     // Re-init Firebase so saves keep working
     initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
-    return;
   }
-
-  // Check for a valid saved session — skip OTP if token exists and hasn't expired
-  const savedToken = localStorage.getItem('tapl-auth-token');
-  const savedEmail = localStorage.getItem('tapl-auth-email');
-  const savedExpiry = localStorage.getItem('tapl-auth-expiry');
-  if (savedToken && savedEmail && savedExpiry && Date.now() < parseInt(savedExpiry)) {
-    currentEmail = savedEmail;
-    showApp();
-    return;
-  }
-
-  // No valid session — clear any stale auth data and show login
-  localStorage.removeItem('tapl-auth-token');
-  localStorage.removeItem('tapl-auth-email');
-  localStorage.removeItem('tapl-auth-expiry');
 });
 </script>
 </body>
