@@ -34,7 +34,6 @@
   .auth-footer { font-family:'Montserrat',sans-serif; font-size:10px; color:#4A3F6B; margin-top:24px; letter-spacing:1px; }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:8px; vertical-align:middle; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  .tapl-authed #auth-screen { display:none !important; }
   @keyframes slideInRight { from { transform:translateX(60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
   @keyframes slideInLeft  { from { transform:translateX(-60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
   .carousel-slide-right { animation: slideInRight 0.22s cubic-bezier(0.25,0.46,0.45,0.94) both; }
@@ -49,22 +48,6 @@
   <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8453C;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
-
-<script>
-// Runs synchronously before React — hides auth screen instantly on post-login reload
-// so there is no flash of the login screen before JS can hide it.
-(function() {
-  try {
-    var pending = sessionStorage.getItem('tapl-pending-email');
-    var token = localStorage.getItem('tapl-auth-token');
-    var expiry = localStorage.getItem('tapl-auth-expiry');
-    var validSession = token && expiry && Date.now() < parseInt(expiry);
-    if (pending || validSession) {
-      document.documentElement.classList.add('tapl-authed');
-    }
-  } catch(e) {}
-})();
-</script>
 
 <div id="auth-screen">
   <div class="auth-card">
@@ -5948,7 +5931,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('app-container').style.display = 'block';
     // Re-init Firebase so saves keep working
     initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
+    return;
   }
+
+  // Valid saved session — skip OTP and boot straight in
+  const savedToken = localStorage.getItem('tapl-auth-token');
+  const savedEmail = localStorage.getItem('tapl-auth-email');
+  const savedExpiry = localStorage.getItem('tapl-auth-expiry');
+  if (savedToken && savedEmail && savedExpiry && Date.now() < parseInt(savedExpiry)) {
+    currentEmail = savedEmail;
+    showApp();
+    return;
+  }
+
+  // No valid session — clear stale auth data and show login
+  localStorage.removeItem('tapl-auth-token');
+  localStorage.removeItem('tapl-auth-email');
+  localStorage.removeItem('tapl-auth-expiry');
 });
 </script>
 </body>
