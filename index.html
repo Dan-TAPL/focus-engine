@@ -49,6 +49,27 @@
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
 
+<script>
+// Runs synchronously before any HTML renders.
+// If we're mid-boot (post-reload or valid saved token), show the
+// loading spinner immediately and hide the auth screen so there is
+// no flash of either screen before JS takes over.
+(function() {
+  try {
+    var booting  = sessionStorage.getItem('tapl-booting');
+    var pending  = sessionStorage.getItem('tapl-pending-email');
+    var token    = localStorage.getItem('tapl-auth-token');
+    var expiry   = localStorage.getItem('tapl-auth-expiry');
+    var valid    = token && expiry && Date.now() < parseInt(expiry);
+    if (booting || pending || valid) {
+      // Show spinner, hide auth — both take effect before first paint
+      document.getElementById('cloud-loading').style.display = 'flex';
+      document.write('<style>#auth-screen{display:none!important}</style>');
+    }
+  } catch(e) {}
+})();
+</script>
+
 <div id="auth-screen">
   <div class="auth-card">
     <div id="screen-email">
@@ -1186,11 +1207,6 @@ function App() {
               borderTop: `1px solid rgba(255,255,255,0.1)`,
               boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
             }}>
-              {window.__taplUserEmail && (
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "Montserrat, sans-serif", marginBottom: 4 }}>
-                  {window.__taplUserEmail}
-                </div>
-              )}
               <button onClick={() => { exportAllCSV(tasks, horizonItems); setMobileMenuOpen(false); }} style={{
                 background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)",
                 borderRadius: 6, padding: "10px 14px", cursor: "pointer",
@@ -1214,12 +1230,13 @@ function App() {
               ...lbl, fontSize: 9, color: "#FFFFFF", letterSpacing: "1px", opacity: 0.7
             }}>⌂ HOME</button>
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flex: 1 }}>
+          {/* Title — absolutely centred regardless of side content widths */}
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none" }}>
+            <div style={{ ...lbl, fontSize: 18, color: "#FFFFFF", letterSpacing: "3px" }}>FOCUS ENGINE</div>
+            <div style={{ ...lbl, fontSize: 9, color: C.red, letterSpacing: "2px", marginTop: 2 }}>BY TAPL</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <button onClick={() => { setHorizonMode(false); }} style={headerTabStyle(!horizonMode, C.red)}>LAUNCH</button>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ ...lbl, fontSize: 18, color: "#FFFFFF", letterSpacing: "3px" }}>FOCUS ENGINE</div>
-              <div style={{ ...lbl, fontSize: 9, color: C.red, letterSpacing: "2px", marginTop: 2 }}>THE ADHD PERFORMANCE LAB</div>
-            </div>
             <button onClick={() => setHorizonMode(true)} style={{ ...headerTabStyle(horizonMode, C.teal), position: "relative" }}>
               HORIZON
               {horizonAlertCount > 0 && !horizonMode && (
@@ -1231,15 +1248,6 @@ function App() {
                 }}>{horizonAlertCount}</span>
               )}
             </button>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {window.__taplUserEmail && (
-              <span style={{
-                fontFamily: "'Montserrat', sans-serif", fontSize: 9,
-                color: "rgba(255,255,255,0.4)", letterSpacing: "0.5px",
-                maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-              }}>{window.__taplUserEmail}</span>
-            )}
             <button onClick={() => exportAllCSV(tasks, horizonItems)} style={{
               background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
               borderRadius: 6, padding: "6px 14px", cursor: "pointer",
@@ -5713,6 +5721,22 @@ update();
               : renderRunSession()
       }
 
+      {/* ── FOOTER ── */}
+      <div style={{
+        textAlign: "center", padding: "24px 20px",
+        borderTop: `1px solid ${T.border}`, marginTop: 40
+      }}>
+        <div style={{ fontFamily: "Montserrat, sans-serif", fontSize: 10, color: T.textDim, letterSpacing: "1px" }}>
+          Questions or feedback —{" "}
+          <a href="mailto:hello@adhdperformance.uk" style={{ color: C.teal, textDecoration: "none" }}>
+            hello@adhdperformance.uk
+          </a>
+        </div>
+        <div style={{ fontFamily: "Montserrat, sans-serif", fontSize: 9, color: T.textFaint, letterSpacing: "1px", marginTop: 6 }}>
+          © 2026 THE ADHD PERFORMANCE LAB LTD
+        </div>
+      </div>
+
       {/* ── FLOATING HORIZON SIDEBAR ── */}
       {horizonMode && hzAlertScrolledPast && (() => {
         const activeHzForSidebar = horizonItems ? horizonItems.filter(i => !i.completed) : [];
@@ -5856,6 +5880,11 @@ async function verifyOTP() {
       document.getElementById('d0').focus();
       btn.disabled=false; btn.innerHTML='Verify & Enter →'; return;
     }
+    // Save token BEFORE showApp so it's available on any reload
+    const expiresIn = data.expires_in || 86400;
+    localStorage.setItem('tapl-auth-token', data.access_token);
+    localStorage.setItem('tapl-auth-email', currentEmail);
+    localStorage.setItem('tapl-auth-expiry', Date.now() + (expiresIn * 1000));
     showApp();
   } catch(e) { showMsg('otp-message','Something went wrong. Please try again.','error'); btn.disabled=false; btn.innerHTML='Verify & Enter →'; }
 }
@@ -5899,6 +5928,7 @@ async function _doCloudLoad() {
     // Store email for after reload, then reload so React starts fresh with cloud data.
     if (dataChanged) {
       sessionStorage.setItem('tapl-pending-email', currentEmail);
+      sessionStorage.setItem('tapl-booting', '1');
       window.location.reload();
       return; // reload is in progress
     }
@@ -5962,6 +5992,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
 
+  // Clear the boot flag now that JS has taken over
+  sessionStorage.removeItem('tapl-booting');
+
   // After a cloud-data reload, skip auth and boot straight into the app
   const pendingEmail = sessionStorage.getItem('tapl-pending-email');
   if (pendingEmail) {
@@ -5969,6 +6002,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentEmail = pendingEmail;
     window.__taplUserEmail = pendingEmail;
     document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('cloud-loading').style.display = 'none';
     document.getElementById('app-container').style.display = 'block';
     // Re-init Firebase so saves keep working
     initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
@@ -5989,6 +6023,8 @@ document.addEventListener('DOMContentLoaded', () => {
   localStorage.removeItem('tapl-auth-token');
   localStorage.removeItem('tapl-auth-email');
   localStorage.removeItem('tapl-auth-expiry');
+  document.getElementById('cloud-loading').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
 });
 </script>
 </body>
