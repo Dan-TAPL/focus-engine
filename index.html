@@ -3520,6 +3520,40 @@ update();
     exitHzSelectMode();
   };
 
+  // Navigate the dashboard to show a specific item — used by the Overdue REVIEW button
+  const navigateToItem = (item) => {
+    const folder = hzFolders.find(f => f.id === item.folderId);
+    const tabId = folder ? (folder.tabId || "all") : "all";
+
+    // Switch to the correct tab
+    setHzActiveTab(tabId);
+
+    if (folder) {
+      // Folder view: expand the folder containing this item
+      setHzView("folders");
+      setCollapsedFolderIds(prev => {
+        const next = new Set([...prev]);
+        next.delete(folder.id); // ensure folder is expanded
+        return next;
+      });
+    } else {
+      // No folder — use timeline view, expand the tier the item lives in
+      setHzView("timeline");
+      const tier = item.dueDate ? getRadarTier(item.dueDate) : "someday";
+      setCollapsedTiers(prev => {
+        const next = new Set([...prev]);
+        next.delete(tier); // ensure tier is expanded
+        return next;
+      });
+    }
+
+    // Scroll to the item after React re-renders
+    setTimeout(() => {
+      const el = document.getElementById("hz-item-" + item.id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  };
+
   const startCapture = () => {
     // If a specific tab is active, pre-select the first folder in that tab
     const defaultFolderId = (() => {
@@ -4212,7 +4246,7 @@ update();
                 const overdue = isPastDue(item);
                 const isSelected = hzSelected.has(item.id);
                 return (
-                  <div key={item.id} style={{
+                  <div key={item.id} id={"hz-item-" + item.id} style={{
                     background: T.card,
                     border: `${isSelected ? "2px" : esc >= 2 ? "2px" : "1px"} solid ${isSelected ? C.purple : overdue ? C.red : escBorder}`,
                     borderRadius: 8, padding: "12px 14px", marginBottom: 6,
@@ -5289,19 +5323,7 @@ update();
                         background: urgencyColor + "15", padding: "3px 8px", borderRadius: 4,
                         border: `1px solid ${urgencyColor}33`
                       }}>{daysOver}D OVERDUE</span>
-                      <button onClick={() => {
-                        setHzEditId(item.id);
-                        setHzCaptureData({
-                          type: item.type, name: item.name, dueDate: item.dueDate || "",
-                          dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
-                          autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
-                          notes: item.notes || "",
-                          chunks: item.chunks ? item.chunks.map(c => c.name) : []
-                        });
-                        setHzCaptureStep(1);
-                        setHzScreen("edit");
-                      }} style={{
+                      <button onClick={() => navigateToItem(item)} style={{
                         padding: "5px 14px", borderRadius: 4, cursor: "pointer",
                         background: C.red, border: "none",
                         ...lbl, fontSize: 8, color: "#FFFFFF", letterSpacing: "1px"
