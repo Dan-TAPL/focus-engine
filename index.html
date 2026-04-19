@@ -3553,6 +3553,41 @@ update();
     exitHzSelectMode();
   };
 
+  // Navigate the dashboard to show a specific item — used by the Overdue REVIEW button
+  const navigateToItem = (item) => {
+    const folder = hzFolders.find(f => f.id === item.folderId);
+    const tabId = folder ? (folder.tabId || "all") : "all";
+
+    // Switch to the correct tab
+    setHzActiveTab(tabId);
+
+    if (folder) {
+      // Folder view: expand the folder containing this item
+      setHzView("folders");
+      setCollapsedFolderIds(prev => {
+        const next = new Set([...prev]);
+        next.delete(folder.id); // ensure folder is expanded
+        return next;
+      });
+    } else {
+      // No folder — use timeline view, expand the tier the item lives in
+      setHzView("timeline");
+      const tier = item.dueDate ? getRadarTier(item.dueDate) : "someday";
+      setCollapsedTiers(prev => {
+        const next = new Set([...prev]);
+        next.delete(tier); // ensure tier is expanded
+        return next;
+      });
+    }
+
+    // Scroll to the item after React re-renders
+    setTimeout(() => {
+      const el = document.getElementById("hz-item-" + item.id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  };
+
+
   const startCapture = () => {
     // If a specific tab is active, pre-select the first folder in that tab
     const defaultFolderId = (() => {
@@ -4245,7 +4280,7 @@ update();
                 const overdue = isPastDue(item);
                 const isSelected = hzSelected.has(item.id);
                 return (
-                  <div key={item.id} style={{
+                  <div key={item.id} id={"hz-item-" + item.id} style={{
                     background: T.card,
                     border: `${isSelected ? "2px" : esc >= 2 ? "2px" : "1px"} solid ${isSelected ? C.purple : overdue ? C.red : escBorder}`,
                     borderRadius: 8, padding: "12px 14px", marginBottom: 6,
@@ -4450,7 +4485,7 @@ update();
                         setHzCaptureData({
                           type: item.type, name: item.name, dueDate: item.dueDate || "",
                           dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
-                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
+                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || null,
                           notes: item.notes || "",
                           chunks: item.chunks ? item.chunks.map(c => c.name) : []
                         });
@@ -5227,7 +5262,7 @@ update();
                       <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                         <button onClick={() => { markReviewed(item.id); advancePulse(); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.green + "15", border: `1px solid ${C.green}44`, ...lbl, fontSize: 8, color: C.green }}>✓ ON TRACK</button>
                         <button onClick={() => { completeHorizonItem(item.id); advancePulse(); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.teal + "15", border: `1px solid ${C.teal}44`, ...lbl, fontSize: 8, color: C.teal }}>✓ COMPLETED</button>
-                        <button onClick={() => { setHzEditId(item.id); setHzCaptureData({ type: item.type, name: item.name, dueDate: item.dueDate || "", dateConfirmed: item.dateConfirmed !== false, size: item.size || "S", repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "", notes: item.notes || "", chunks: item.chunks ? item.chunks.map(c => c.name) : [] }); setHzCaptureStep(1); setHzScreen("edit"); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.amber + "15", border: `1px solid ${C.amber}44`, ...lbl, fontSize: 8, color: C.amber }}>✎ UPDATE</button>
+                        <button onClick={() => { setHzEditId(item.id); setHzCaptureData({ type: item.type, name: item.name, dueDate: item.dueDate || "", dateConfirmed: item.dateConfirmed !== false, size: item.size || "S", repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium", autoRefresh: item.autoRefresh !== false, folderId: item.folderId || null, notes: item.notes || "", chunks: item.chunks ? item.chunks.map(c => c.name) : [] }); setHzCaptureStep(1); setHzScreen("edit"); }} style={{ padding: "5px 12px", borderRadius: 4, cursor: "pointer", background: C.amber + "15", border: `1px solid ${C.amber}44`, ...lbl, fontSize: 8, color: C.amber }}>✎ UPDATE</button>
                       </div>
                     </div>
                     {/* Nav arrows */}
@@ -5287,16 +5322,50 @@ update();
               </div>
               {filteredOverdue.length === 0 ? (
                 <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif" }}>No overdue items in this tab.</div>
-              ) : filteredOverdue.map(item => (
-                <div key={item.id} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text,
-                  borderRadius: 4, background: dark ? "rgba(232,69,60,0.06)" : "transparent"
-                }}>
-                  <span style={{ fontWeight: 700 }}>{item.name}</span>
-                  <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
-                </div>
-              ))}
+              ) : filteredOverdue.map(item => {
+                const daysOver = Math.abs(daysUntil(item.dueDate));
+                const urgencyColor = daysOver >= 7 ? "#C0392B" : C.red;
+                return (
+                  <div key={item.id} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "10px 14px", marginBottom: 8, gap: 12, flexWrap: "wrap",
+                    borderRadius: 8,
+                    background: dark ? "rgba(20,8,8,0.6)" : "#FFFFFF",
+                    border: `1px solid ${urgencyColor}55`,
+                    borderLeft: `4px solid ${urgencyColor}`,
+                    boxShadow: dark
+                      ? `0 3px 0 rgba(0,0,0,0.5), 0 4px 12px rgba(232,69,60,0.2)`
+                      : `0 3px 0 ${urgencyColor}44, 0 4px 12px rgba(232,69,60,0.12)`,
+                    transform: "translateY(0)",
+                    transition: "transform 0.1s, box-shadow 0.1s"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                        background: urgencyColor,
+                        boxShadow: `0 0 6px ${urgencyColor}`
+                      }} />
+                      <span style={{
+                        fontWeight: 900, fontSize: 13, color: dark ? "#FFFFFF" : "#1A1035",
+                        fontFamily: "Montserrat, sans-serif",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                      }}>{item.name}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{
+                        ...lbl, fontSize: 9, color: urgencyColor,
+                        background: urgencyColor + "15", padding: "3px 8px", borderRadius: 4,
+                        border: `1px solid ${urgencyColor}33`
+                      }}>{daysOver}D OVERDUE</span>
+                      <button onClick={() => navigateToItem(item)} style={{
+                        padding: "5px 14px", borderRadius: 4, cursor: "pointer",
+                        background: C.red, border: "none",
+                        ...lbl, fontSize: 8, color: "#FFFFFF", letterSpacing: "1px"
+                      }}>REVIEW</button>
+                    </div>
+                  </div>
+                );
+              })}
               {overdueFilterTab !== "all" && filteredOverdue.length < pastDueItems.length && (
                 <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginTop: 8 }}>{pastDueItems.length - filteredOverdue.length} more overdue item{pastDueItems.length - filteredOverdue.length !== 1 ? "s" : ""} in other tabs</div>
               )}
@@ -6031,6 +6100,13 @@ function backToEmail() {
   [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
   hideMsg('email-message'); hideMsg('otp-message');
   showScreen('screen-email');
+}
+
+function signOut() {
+  localStorage.removeItem('tapl-auth-token');
+  localStorage.removeItem('tapl-auth-email');
+  localStorage.removeItem('tapl-auth-expiry');
+  window.location.reload();
 }
 
 function otpInput(el, idx) {
