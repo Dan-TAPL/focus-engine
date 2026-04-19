@@ -12,9 +12,8 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #3D2B79; border-radius: 3px; }
 
-  #auth-screen { display:none; align-items:center; justify-content:center; min-height:100vh; background:#1A1035; }
+  #auth-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#1A1035; }
   #app-container { display:none; }
-  #cloud-loading { display:flex; }
   .auth-card { background:#241850; border:1px solid #3D2B79; border-radius:16px; padding:40px 32px; width:100%; max-width:420px; text-align:center; }
   .auth-logo { font-family:'Montserrat',sans-serif; font-weight:900; font-size:22px; letter-spacing:3px; color:#FFFFFF; text-transform:uppercase; margin-bottom:6px; }
   .auth-sub { font-family:'Montserrat',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; color:#E8453C; text-transform:uppercase; margin-bottom:32px; }
@@ -45,10 +44,31 @@
 </head>
 <body>
 
-<div id="cloud-loading" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#1A1035;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+<div id="cloud-loading" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#1A1035;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
   <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8453C;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
+
+<script>
+// Runs synchronously before any HTML renders.
+// If we're mid-boot (post-reload or valid saved token), show the
+// loading spinner immediately and hide the auth screen so there is
+// no flash of either screen before JS takes over.
+(function() {
+  try {
+    var booting  = sessionStorage.getItem('tapl-booting');
+    var pending  = sessionStorage.getItem('tapl-pending-email');
+    var token    = localStorage.getItem('tapl-auth-token');
+    var expiry   = localStorage.getItem('tapl-auth-expiry');
+    var valid    = token && expiry && Date.now() < parseInt(expiry);
+    if (booting || pending || valid) {
+      // Show spinner, hide auth — both take effect before first paint
+      document.getElementById('cloud-loading').style.display = 'flex';
+      document.write('<style>#auth-screen{display:none!important}</style>');
+    }
+  } catch(e) {}
+})();
+</script>
 
 <div id="auth-screen">
   <div class="auth-card">
@@ -1485,6 +1505,39 @@ function App() {
   useEffect(() => { saveData("tapl-session-end", sessionEnd); }, [sessionEnd]);
   useEffect(() => { saveData("tapl-completed-tasks", [...completedTaskIds]); }, [completedTaskIds]);
   useEffect(() => { saveData("tapl-skipped-tasks", [...skippedTaskIds]); }, [skippedTaskIds]);
+
+  // When Firebase sync finds newer data, re-read all key state from localStorage
+  // without any page reload — eliminates the loading flicker entirely
+  useEffect(() => {
+    const onCloudSync = () => {
+      const freshHorizon = loadHorizon();
+      if (Array.isArray(freshHorizon)) {
+        setHorizonItems(freshHorizon.map(i => ({
+          ...i,
+          chunks: Array.isArray(i.chunks) ? i.chunks : [],
+          completed: !!i.completed,
+          repeat: i.repeat || "none",
+          pulseFreq: i.pulseFreq || "medium",
+          autoRefresh: i.autoRefresh !== false,
+          needsCarryForward: !!i.needsCarryForward,
+          needsRefreshPrompt: false,
+          lastCompletedAt: i.lastCompletedAt || null,
+          createdAt: i.createdAt || i.lastReviewed || new Date().toISOString(),
+          lastReviewed: i.lastReviewed || i.createdAt || new Date().toISOString()
+        })));
+      }
+      const freshFolders = loadData("tapl-hz-folders", []);
+      if (Array.isArray(freshFolders)) setHzFolders(freshFolders);
+      const freshTabs = loadData("tapl-hz-tabs", []);
+      if (Array.isArray(freshTabs)) setHzTabs(freshTabs);
+      const freshTasks = loadData("tapl-tasks", null);
+      if (Array.isArray(freshTasks) && freshTasks.length > 0) setTasks(freshTasks);
+      const freshBlocks = loadData("tapl-blocks", []);
+      if (Array.isArray(freshBlocks)) setBlocks(freshBlocks);
+    };
+    window.addEventListener('tapl-cloud-synced', onCloudSync);
+    return () => window.removeEventListener('tapl-cloud-synced', onCloudSync);
+  }, []);
 
   // Clean stale task IDs from blocks when tasks change
   useEffect(() => {
@@ -3500,40 +3553,6 @@ update();
     exitHzSelectMode();
   };
 
-  // Navigate the dashboard to show a specific item — used by the Overdue REVIEW button
-  const navigateToItem = (item) => {
-    const folder = hzFolders.find(f => f.id === item.folderId);
-    const tabId = folder ? (folder.tabId || "all") : "all";
-
-    // Switch to the correct tab
-    setHzActiveTab(tabId);
-
-    if (folder) {
-      // Folder view: expand the folder containing this item
-      setHzView("folders");
-      setCollapsedFolderIds(prev => {
-        const next = new Set([...prev]);
-        next.delete(folder.id); // ensure folder is expanded
-        return next;
-      });
-    } else {
-      // No folder — use timeline view, expand the tier the item lives in
-      setHzView("timeline");
-      const tier = item.dueDate ? getRadarTier(item.dueDate) : "someday";
-      setCollapsedTiers(prev => {
-        const next = new Set([...prev]);
-        next.delete(tier); // ensure tier is expanded
-        return next;
-      });
-    }
-
-    // Scroll to the item after React re-renders
-    setTimeout(() => {
-      const el = document.getElementById("hz-item-" + item.id);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 120);
-  };
-
   const startCapture = () => {
     // If a specific tab is active, pre-select the first folder in that tab
     const defaultFolderId = (() => {
@@ -4226,7 +4245,7 @@ update();
                 const overdue = isPastDue(item);
                 const isSelected = hzSelected.has(item.id);
                 return (
-                  <div key={item.id} id={"hz-item-" + item.id} style={{
+                  <div key={item.id} style={{
                     background: T.card,
                     border: `${isSelected ? "2px" : esc >= 2 ? "2px" : "1px"} solid ${isSelected ? C.purple : overdue ? C.red : escBorder}`,
                     borderRadius: 8, padding: "12px 14px", marginBottom: 6,
@@ -5268,50 +5287,16 @@ update();
               </div>
               {filteredOverdue.length === 0 ? (
                 <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif" }}>No overdue items in this tab.</div>
-              ) : filteredOverdue.map(item => {
-                const daysOver = Math.abs(daysUntil(item.dueDate));
-                const urgencyColor = daysOver >= 7 ? "#C0392B" : C.red;
-                return (
-                  <div key={item.id} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 14px", marginBottom: 8, gap: 12, flexWrap: "wrap",
-                    borderRadius: 8,
-                    background: dark ? "rgba(20,8,8,0.6)" : "#FFFFFF",
-                    border: `1px solid ${urgencyColor}55`,
-                    borderLeft: `4px solid ${urgencyColor}`,
-                    boxShadow: dark
-                      ? `0 3px 0 rgba(0,0,0,0.5), 0 4px 12px rgba(232,69,60,0.2)`
-                      : `0 3px 0 ${urgencyColor}44, 0 4px 12px rgba(232,69,60,0.12)`,
-                    transform: "translateY(0)",
-                    transition: "transform 0.1s, box-shadow 0.1s"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                        background: urgencyColor,
-                        boxShadow: `0 0 6px ${urgencyColor}`
-                      }} />
-                      <span style={{
-                        fontWeight: 900, fontSize: 13, color: dark ? "#FFFFFF" : "#1A1035",
-                        fontFamily: "Montserrat, sans-serif",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-                      }}>{item.name}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span style={{
-                        ...lbl, fontSize: 9, color: urgencyColor,
-                        background: urgencyColor + "15", padding: "3px 8px", borderRadius: 4,
-                        border: `1px solid ${urgencyColor}33`
-                      }}>{daysOver}D OVERDUE</span>
-                      <button onClick={() => navigateToItem(item)} style={{
-                        padding: "5px 14px", borderRadius: 4, cursor: "pointer",
-                        background: C.red, border: "none",
-                        ...lbl, fontSize: 8, color: "#FFFFFF", letterSpacing: "1px"
-                      }}>REVIEW</button>
-                    </div>
-                  </div>
-                );
-              })}
+              ) : filteredOverdue.map(item => (
+                <div key={item.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text,
+                  borderRadius: 4, background: dark ? "rgba(232,69,60,0.06)" : "transparent"
+                }}>
+                  <span style={{ fontWeight: 700 }}>{item.name}</span>
+                  <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
+                </div>
+              ))}
               {overdueFilterTab !== "all" && filteredOverdue.length < pastDueItems.length && (
                 <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginTop: 8 }}>{pastDueItems.length - filteredOverdue.length} more overdue item{pastDueItems.length - filteredOverdue.length !== 1 ? "s" : ""} in other tabs</div>
               )}
@@ -5988,24 +5973,14 @@ async function verifyOTP() {
 
 async function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
-  // cloud-loading is already visible by default — no need to show it
+  document.getElementById('cloud-loading').style.display = 'flex';
   window.__taplUserEmail = currentEmail;
 
-  // If flagged from a data-changed reload, localStorage is already current.
-  // Skip Firebase entirely — just show the app immediately.
-  if (sessionStorage.getItem('tapl-skip-firebase')) {
-    sessionStorage.removeItem('tapl-skip-firebase');
-    await initCloudForUser(currentEmail);
-    document.getElementById('cloud-loading').style.display = 'none';
-    document.getElementById('app-container').style.display = 'block';
-    return;
-  }
-
-  // Normal path — load Firebase, then show app
+  // Wrap all cloud operations in a 5s timeout — app always boots regardless
   try {
     await Promise.race([
       _doCloudLoad(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
     ]);
   } catch(e) {
     console.warn('Cloud load skipped:', e.message, '— using local data');
@@ -6020,7 +5995,6 @@ async function _doCloudLoad() {
   const cloudData = await loadAllFromCloud();
 
   if (cloudData) {
-    // Write all cloud data into localStorage
     let dataChanged = false;
     CLOUD_KEYS.forEach(k => {
       if (cloudData[k] !== undefined) {
@@ -6031,15 +6005,13 @@ async function _doCloudLoad() {
         }
       }
     });
-    // If data changed, reload so React re-initialises from fresh localStorage.
-    // Set a flag so the reload skips Firebase and shows the app immediately.
+    // If cloud had data that differs from local, notify React to re-read state.
+    // Using an event avoids any page reload and eliminates the loading flicker.
     if (dataChanged) {
-      sessionStorage.setItem('tapl-skip-firebase', '1');
-      window.location.reload();
+      window.dispatchEvent(new CustomEvent('tapl-cloud-synced'));
       return;
     }
   } else {
-    // No cloud data yet — migrate local data up to Firebase
     const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
     if (hasLocalData) {
       const payload = {};
@@ -6054,6 +6026,7 @@ async function _doCloudLoad() {
     }
   }
 }
+
 function backToEmail() {
   [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
   hideMsg('email-message'); hideMsg('otp-message');
@@ -6098,6 +6071,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
 
+  // Clear the boot flag now that JS has taken over
+  sessionStorage.removeItem('tapl-booting');
+
+  // After a cloud-data reload, skip auth and boot straight into the app
+  const pendingEmail = sessionStorage.getItem('tapl-pending-email');
+  if (pendingEmail) {
+    sessionStorage.removeItem('tapl-pending-email');
+    currentEmail = pendingEmail;
+    window.__taplUserEmail = pendingEmail;
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('cloud-loading').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    // Re-init Firebase so saves keep working
+    initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
+    return;
+  }
+
   // Valid saved session — skip OTP and boot straight in
   const savedToken = localStorage.getItem('tapl-auth-token');
   const savedEmail = localStorage.getItem('tapl-auth-email');
@@ -6108,7 +6098,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // No valid session — show login screen
+  // No valid session — clear stale auth data and show login
   localStorage.removeItem('tapl-auth-token');
   localStorage.removeItem('tapl-auth-email');
   localStorage.removeItem('tapl-auth-expiry');
