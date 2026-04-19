@@ -12,8 +12,9 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #3D2B79; border-radius: 3px; }
 
-  #auth-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#1A1035; }
+  #auth-screen { display:none; align-items:center; justify-content:center; min-height:100vh; background:#1A1035; }
   #app-container { display:none; }
+  #cloud-loading { display:flex; }
   .auth-card { background:#241850; border:1px solid #3D2B79; border-radius:16px; padding:40px 32px; width:100%; max-width:420px; text-align:center; }
   .auth-logo { font-family:'Montserrat',sans-serif; font-weight:900; font-size:22px; letter-spacing:3px; color:#FFFFFF; text-transform:uppercase; margin-bottom:6px; }
   .auth-sub { font-family:'Montserrat',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; color:#E8453C; text-transform:uppercase; margin-bottom:32px; }
@@ -44,27 +45,10 @@
 </head>
 <body>
 
-<div id="cloud-loading" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#1A1035;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+<div id="cloud-loading" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#1A1035;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
   <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.2);border-top-color:#E8453C;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
-
-<script>
-// Runs synchronously before first paint.
-// Show spinner and hide auth immediately for any boot path that bypasses the login screen.
-(function() {
-  try {
-    var skip    = sessionStorage.getItem('tapl-skip-firebase');
-    var token   = localStorage.getItem('tapl-auth-token');
-    var expiry  = localStorage.getItem('tapl-auth-expiry');
-    var valid   = token && expiry && Date.now() < parseInt(expiry);
-    if (skip || valid) {
-      document.getElementById('cloud-loading').style.display = 'flex';
-      document.write('<style>#auth-screen{display:none!important}</style>');
-    }
-  } catch(e) {}
-})();
-</script>
 
 <div id="auth-screen">
   <div class="auth-card">
@@ -6004,14 +5988,14 @@ async function verifyOTP() {
 
 async function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('cloud-loading').style.display = 'flex';
+  // cloud-loading is already visible by default — no need to show it
   window.__taplUserEmail = currentEmail;
 
   // If flagged from a data-changed reload, localStorage is already current.
   // Skip Firebase entirely — just show the app immediately.
   if (sessionStorage.getItem('tapl-skip-firebase')) {
     sessionStorage.removeItem('tapl-skip-firebase');
-    await initCloudForUser(currentEmail); // re-init so saves work going forward
+    await initCloudForUser(currentEmail);
     document.getElementById('cloud-loading').style.display = 'none';
     document.getElementById('app-container').style.display = 'block';
     return;
