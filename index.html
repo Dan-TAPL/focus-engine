@@ -5254,16 +5254,62 @@ update();
               </div>
               {filteredOverdue.length === 0 ? (
                 <div style={{ fontSize: 11, color: T.textDim, fontFamily: "Montserrat, sans-serif" }}>No overdue items in this tab.</div>
-              ) : filteredOverdue.map(item => (
-                <div key={item.id} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "6px 10px", marginBottom: 2, fontSize: 11, color: T.text,
-                  borderRadius: 4, background: dark ? "rgba(232,69,60,0.06)" : "transparent"
-                }}>
-                  <span style={{ fontWeight: 700 }}>{item.name}</span>
-                  <span style={{ ...lbl, fontSize: 9, color: C.red }}>{Math.abs(daysUntil(item.dueDate))}d OVERDUE</span>
-                </div>
-              ))}
+              ) : filteredOverdue.map(item => {
+                const daysOver = Math.abs(daysUntil(item.dueDate));
+                const urgencyColor = daysOver >= 7 ? "#C0392B" : C.red;
+                return (
+                  <div key={item.id} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "10px 14px", marginBottom: 8, gap: 12, flexWrap: "wrap",
+                    borderRadius: 8,
+                    background: dark ? "rgba(20,8,8,0.6)" : "#FFFFFF",
+                    border: `1px solid ${urgencyColor}55`,
+                    borderLeft: `4px solid ${urgencyColor}`,
+                    boxShadow: dark
+                      ? `0 3px 0 rgba(0,0,0,0.5), 0 4px 12px rgba(232,69,60,0.2)`
+                      : `0 3px 0 ${urgencyColor}44, 0 4px 12px rgba(232,69,60,0.12)`,
+                    transform: "translateY(0)",
+                    transition: "transform 0.1s, box-shadow 0.1s"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                        background: urgencyColor,
+                        boxShadow: `0 0 6px ${urgencyColor}`
+                      }} />
+                      <span style={{
+                        fontWeight: 900, fontSize: 13, color: dark ? "#FFFFFF" : "#1A1035",
+                        fontFamily: "Montserrat, sans-serif",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                      }}>{item.name}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{
+                        ...lbl, fontSize: 9, color: urgencyColor,
+                        background: urgencyColor + "15", padding: "3px 8px", borderRadius: 4,
+                        border: `1px solid ${urgencyColor}33`
+                      }}>{daysOver}D OVERDUE</span>
+                      <button onClick={() => {
+                        setHzEditId(item.id);
+                        setHzCaptureData({
+                          type: item.type, name: item.name, dueDate: item.dueDate || "",
+                          dateConfirmed: item.dateConfirmed !== false, size: item.size || "S",
+                          repeat: item.repeat || "none", pulseFreq: item.pulseFreq || "medium",
+                          autoRefresh: item.autoRefresh !== false, folderId: item.folderId || "",
+                          notes: item.notes || "",
+                          chunks: item.chunks ? item.chunks.map(c => c.name) : []
+                        });
+                        setHzCaptureStep(1);
+                        setHzScreen("edit");
+                      }} style={{
+                        padding: "5px 14px", borderRadius: 4, cursor: "pointer",
+                        background: C.red, border: "none",
+                        ...lbl, fontSize: 8, color: "#FFFFFF", letterSpacing: "1px"
+                      }}>REVIEW</button>
+                    </div>
+                  </div>
+                );
+              })}
               {overdueFilterTab !== "all" && filteredOverdue.length < pastDueItems.length && (
                 <div style={{ ...lbl, fontSize: 9, color: T.textDim, marginTop: 8 }}>{pastDueItems.length - filteredOverdue.length} more overdue item{pastDueItems.length - filteredOverdue.length !== 1 ? "s" : ""} in other tabs</div>
               )}
