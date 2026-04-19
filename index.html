@@ -49,22 +49,6 @@
   <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:#8B80A5;text-transform:uppercase;">Loading your data...</div>
 </div>
 
-<script>
-// Runs synchronously before first paint.
-// If a valid saved session exists, show the spinner and hide auth immediately
-// so there is no flash of the login screen.
-(function() {
-  try {
-    var token  = localStorage.getItem('tapl-auth-token');
-    var expiry = localStorage.getItem('tapl-auth-expiry');
-    if (token && expiry && Date.now() < parseInt(expiry)) {
-      document.getElementById('cloud-loading').style.display = 'flex';
-      document.write('<style>#auth-screen{display:none!important}</style>');
-    }
-  } catch(e) {}
-})();
-</script>
-
 <div id="auth-screen">
   <div class="auth-card">
     <div id="screen-email">
@@ -935,6 +919,17 @@ function App() {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // When background Firebase sync finds newer data, reload cleanly to pick it up
+  // React isn't pre-mounted so this is just spinner → app, no flicker
+  useEffect(() => {
+    const handleSync = () => {
+      sessionStorage.setItem('tapl-skip-firebase', '1');
+      window.location.reload();
+    };
+    window.addEventListener('tapl-cloud-synced', handleSync);
+    return () => window.removeEventListener('tapl-cloud-synced', handleSync);
   }, []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -5936,7 +5931,12 @@ update();
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
+// React is mounted on demand by showApp() — not automatically on page load.
+// This prevents the landing page flickering during Firebase load.
+function mountReactApp() {
+  if (document.getElementById('root').childNodes.length > 0) return; // already mounted
+  ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+}
 </script>
 
 </div><!-- end app-container -->
@@ -6003,50 +6003,59 @@ async function verifyOTP() {
 
 async function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('cloud-loading').style.display = 'flex';
   window.__taplUserEmail = currentEmail;
 
-  // Load cloud data into localStorage BEFORE React mounts.
-  // This eliminates the reload cycle entirely.
-  try {
-    await Promise.race([
-      _doCloudLoad(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
-    ]);
-  } catch(e) {
-    console.warn('Cloud load skipped:', e.message, '— using local data');
+  // Mount React immediately from localStorage — app is usable at once, no spinner
+  mountReactApp();
+  document.getElementById('app-container').style.display = 'block';
+
+  // If this is a post-sync reload, localStorage is already fresh — skip Firebase
+  if (sessionStorage.getItem('tapl-skip-firebase')) {
+    sessionStorage.removeItem('tapl-skip-firebase');
+    await initCloudForUser(currentEmail); // re-init so saves work
+    return;
   }
 
-  // React mounts once with correct data already in localStorage
-  document.getElementById('cloud-loading').style.display = 'none';
-  document.getElementById('app-container').style.display = 'block';
+  // First load — sync Firebase in background without blocking the UI
+  _syncFirebaseBackground();
 }
 
-async function _doCloudLoad() {
-  await initCloudForUser(currentEmail);
-  const cloudData = await loadAllFromCloud();
-
-  if (cloudData) {
-    // Write all cloud data into localStorage before React mounts
-    CLOUD_KEYS.forEach(k => {
-      if (cloudData[k] !== undefined) {
-        localStorage.setItem(k, JSON.stringify(cloudData[k]));
-      }
-    });
-  } else {
-    // No cloud data yet — migrate local data up to Firebase
-    const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
-    if (hasLocalData) {
-      const payload = {};
+async function _syncFirebaseBackground() {
+  try {
+    await initCloudForUser(currentEmail);
+    const cloudData = await loadAllFromCloud();
+    if (cloudData) {
+      let changed = false;
       CLOUD_KEYS.forEach(k => {
-        const raw = localStorage.getItem(k);
-        if (raw !== null) { try { payload[k] = JSON.parse(raw); } catch(e) {} }
+        if (cloudData[k] !== undefined) {
+          const newVal = JSON.stringify(cloudData[k]);
+          if (localStorage.getItem(k) !== newVal) {
+            localStorage.setItem(k, newVal);
+            changed = true;
+          }
+        }
       });
-      try {
-        await _firebaseDb.ref(_userPath + '/data').set(payload);
-        console.log('Local data migrated to cloud.');
-      } catch(e) { console.error('Migration failed:', e); }
+      // If cloud had newer data, trigger a soft reload of just the React state
+      // by dispatching a storage event so React re-reads localStorage
+      if (changed) {
+        window.dispatchEvent(new Event('tapl-cloud-synced'));
+      }
+    } else {
+      // No cloud data — push local data up
+      const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
+      if (hasLocalData) {
+        const payload = {};
+        CLOUD_KEYS.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw !== null) { try { payload[k] = JSON.parse(raw); } catch(e) {} }
+        });
+        try {
+          await _firebaseDb.ref(_userPath + '/data').set(payload);
+        } catch(e) { console.error('Migration failed:', e); }
+      }
     }
+  } catch(e) {
+    console.warn('Background Firebase sync failed:', e.message);
   }
 }
 function backToEmail() {
@@ -6107,7 +6116,6 @@ document.addEventListener('DOMContentLoaded', () => {
   localStorage.removeItem('tapl-auth-token');
   localStorage.removeItem('tapl-auth-email');
   localStorage.removeItem('tapl-auth-expiry');
-  document.getElementById('cloud-loading').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
 });
 </script>
