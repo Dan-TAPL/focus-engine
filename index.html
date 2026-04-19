@@ -937,6 +937,13 @@ function App() {
   const [step, setStep] = useState(0);
   const [horizonMode, setHorizonMode] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
+  const [appReady, setAppReady] = useState(false);
+
+  // Signal to the DOM that React has mounted and is ready to be shown
+  useEffect(() => {
+    setAppReady(true);
+    document.getElementById('app-container').setAttribute('data-react-ready', '1');
+  }, []);
 
   // --- Horizon State (declared early for nav badge) ---
   const [horizonItems, setHorizonItems] = useState(() => {
@@ -5931,12 +5938,8 @@ update();
   );
 }
 
-// React is mounted on demand by showApp() — not automatically on page load.
-// This prevents the landing page flickering during Firebase load.
-function mountReactApp() {
-  if (document.getElementById('root').childNodes.length > 0) return; // already mounted
-  ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
-}
+// React mounts automatically. app-container stays display:none until showApp() reveals it.
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
 </script>
 
 </div><!-- end app-container -->
@@ -6005,18 +6008,29 @@ async function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
   window.__taplUserEmail = currentEmail;
 
-  // Mount React immediately from localStorage — app is usable at once, no spinner
-  mountReactApp();
+  // Wait for React to finish its first render before revealing the container.
+  // This prevents the landing page flashing before auth/data is ready.
+  await new Promise(resolve => {
+    const check = () => {
+      if (document.getElementById('app-container').getAttribute('data-react-ready')) {
+        resolve();
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    requestAnimationFrame(check);
+  });
+
   document.getElementById('app-container').style.display = 'block';
 
   // If this is a post-sync reload, localStorage is already fresh — skip Firebase
   if (sessionStorage.getItem('tapl-skip-firebase')) {
     sessionStorage.removeItem('tapl-skip-firebase');
-    await initCloudForUser(currentEmail); // re-init so saves work
+    await initCloudForUser(currentEmail);
     return;
   }
 
-  // First load — sync Firebase in background without blocking the UI
+  // Sync Firebase in the background without blocking the UI
   _syncFirebaseBackground();
 }
 
