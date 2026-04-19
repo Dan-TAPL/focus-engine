@@ -50,19 +50,14 @@
 </div>
 
 <script>
-// Runs synchronously before any HTML renders.
-// If we're mid-boot (post-reload or valid saved token), show the
-// loading spinner immediately and hide the auth screen so there is
-// no flash of either screen before JS takes over.
+// Runs synchronously before first paint.
+// If a valid saved session exists, show the spinner and hide auth immediately
+// so there is no flash of the login screen.
 (function() {
   try {
-    var booting  = sessionStorage.getItem('tapl-booting');
-    var pending  = sessionStorage.getItem('tapl-pending-email');
-    var token    = localStorage.getItem('tapl-auth-token');
-    var expiry   = localStorage.getItem('tapl-auth-expiry');
-    var valid    = token && expiry && Date.now() < parseInt(expiry);
-    if (booting || pending || valid) {
-      // Show spinner, hide auth — both take effect before first paint
+    var token  = localStorage.getItem('tapl-auth-token');
+    var expiry = localStorage.getItem('tapl-auth-expiry');
+    if (token && expiry && Date.now() < parseInt(expiry)) {
       document.getElementById('cloud-loading').style.display = 'flex';
       document.write('<style>#auth-screen{display:none!important}</style>');
     }
@@ -6011,16 +6006,18 @@ async function showApp() {
   document.getElementById('cloud-loading').style.display = 'flex';
   window.__taplUserEmail = currentEmail;
 
-  // Wrap all cloud operations in a 5s timeout — app always boots regardless
+  // Load cloud data into localStorage BEFORE React mounts.
+  // This eliminates the reload cycle entirely.
   try {
     await Promise.race([
       _doCloudLoad(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
     ]);
   } catch(e) {
     console.warn('Cloud load skipped:', e.message, '— using local data');
   }
 
+  // React mounts once with correct data already in localStorage
   document.getElementById('cloud-loading').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
 }
@@ -6030,26 +6027,14 @@ async function _doCloudLoad() {
   const cloudData = await loadAllFromCloud();
 
   if (cloudData) {
-    let dataChanged = false;
+    // Write all cloud data into localStorage before React mounts
     CLOUD_KEYS.forEach(k => {
       if (cloudData[k] !== undefined) {
-        const newVal = JSON.stringify(cloudData[k]);
-        if (localStorage.getItem(k) !== newVal) {
-          localStorage.setItem(k, newVal);
-          dataChanged = true;
-        }
+        localStorage.setItem(k, JSON.stringify(cloudData[k]));
       }
     });
-    // If cloud had data that differs from local, the React app hasn't seen it yet
-    // (React initialised from localStorage before we loaded cloud data).
-    // Store email for after reload, then reload so React starts fresh with cloud data.
-    if (dataChanged) {
-      sessionStorage.setItem('tapl-pending-email', currentEmail);
-      sessionStorage.setItem('tapl-booting', '1');
-      window.location.reload();
-      return; // reload is in progress
-    }
   } else {
+    // No cloud data yet — migrate local data up to Firebase
     const hasLocalData = CLOUD_KEYS.some(k => localStorage.getItem(k) !== null);
     if (hasLocalData) {
       const payload = {};
@@ -6064,7 +6049,6 @@ async function _doCloudLoad() {
     }
   }
 }
-
 function backToEmail() {
   [0,1,2,3,4,5].forEach(i => { document.getElementById('d'+i).value=''; });
   hideMsg('email-message'); hideMsg('otp-message');
@@ -6109,23 +6093,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('email-input');
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') sendOTP(); });
 
-  // Clear the boot flag now that JS has taken over
-  sessionStorage.removeItem('tapl-booting');
-
-  // After a cloud-data reload, skip auth and boot straight into the app
-  const pendingEmail = sessionStorage.getItem('tapl-pending-email');
-  if (pendingEmail) {
-    sessionStorage.removeItem('tapl-pending-email');
-    currentEmail = pendingEmail;
-    window.__taplUserEmail = pendingEmail;
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('cloud-loading').style.display = 'none';
-    document.getElementById('app-container').style.display = 'block';
-    // Re-init Firebase so saves keep working
-    initCloudForUser(pendingEmail).then(() => { _cloudReady = true; });
-    return;
-  }
-
   // Valid saved session — skip OTP and boot straight in
   const savedToken = localStorage.getItem('tapl-auth-token');
   const savedEmail = localStorage.getItem('tapl-auth-email');
@@ -6136,7 +6103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // No valid session — clear stale auth data and show login
+  // No valid session — show login screen
   localStorage.removeItem('tapl-auth-token');
   localStorage.removeItem('tapl-auth-email');
   localStorage.removeItem('tapl-auth-expiry');
